@@ -47,7 +47,7 @@ class MergeTabsMiddleware(
         val currentTab = context.state.privateTabs.first()
         val newTab = action.tab
 
-        if (!shouldLoadInExistingTab(newTab.content.url)) {
+        if (!shouldLoadInExistingTab(newTab.content.url) && !isFirstNewWindowRequest(currentTab, newTab)) {
             // This is a URL we do not want to load in an existing tab. Let's just bail.
             return
         }
@@ -64,10 +64,13 @@ class MergeTabsMiddleware(
         context.dispatch(TabListAction.RemoveTabAction(currentTab.id))
 
         // Now we load the URL in the new tab.
+        // If we are to merge a window request we need to use that request's url coming from GeckoView
+        // otherwise default to the new tab's url.
+        val urlToLoad = currentTab.content.windowRequest?.url ?: newTab.content.url
         context.dispatch(
             EngineAction.LoadUrlAction(
                 mergedTab.id,
-                url = newTab.content.url,
+                url = urlToLoad,
                 flags = EngineSession.LoadUrlFlags.select(
                     // To be safe we use the external flag here, since its not the user who decided to
                     // load this URL in this existing session.
@@ -91,6 +94,17 @@ private fun mergeTabs(
             // old ID. The engine middleware will create a new observer.
             engineObserver = null
         )
+<<<<<<< HEAD
+=======
+    }
+
+    // We are giving the ID of the new tab. This will make
+    // sure that code that created the tab can still access it with the ID.
+    return currentTab.copy(
+        newTab.id,
+        engineState = newEngineState,
+        content = currentTab.content.copy(windowRequest = null)
+>>>>>>> cf64bb081 (For #6542 - Open WindowRequest url in current tab if multitab is disabled)
     )
 }
 
@@ -100,4 +114,18 @@ private fun shouldLoadInExistingTab(url: String): Boolean {
         cleanedUrl.startsWith("https:") ||
         cleanedUrl.startsWith("data:") ||
         cleanedUrl.startsWith("focus:")
+}
+
+/**
+ * A new window request (target="_blank" links or window.open) will have it's own EngineSession
+ * and there might be multiple AddAddTabAction("about:blank") about it.
+ *
+ * This method checks the status of both [currentTab] and [newTab] to ensure that we can only act once
+ * at the right moment if needing to merge a new window request.
+ */
+private fun isFirstNewWindowRequest(currentTab: TabSessionState, newTab: TabSessionState): Boolean {
+    val isNewWindowRequest = newTab.content.url == "about:blank" && newTab.engineState.engineSession != null
+    val wasRequestConsumed = currentTab.content.windowRequest == null
+
+    return isNewWindowRequest && !wasRequestConsumed
 }
