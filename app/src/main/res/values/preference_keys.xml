@@ -14,11 +14,7 @@
     <string name="pref_key_privacy_block_other3" translatable="false"><xliff:g id="preference_key">pref_privacy_block_other3</xliff:g></string>
     <string name="pref_key_privacy_total_trackers_blocked_count" translatable="false"><xliff:g id="preference_key">pref_key_privacy_total_trackers_blocked_count</xliff:g></string>
     <string name="pref_key_privacy_ever_changed_etp" translatable="false"><xliff:g id="preference_key">pref_key_privacy_ever_changed_etp</xliff:g></string>
-    <string name="pref_key_site_permissions" translatable="false"><xliff:g id="preference_key">pref_key_privacy_site_permissions</xliff:g></string>
-    <string name="pref_key_autoplay" translatable="false"><xliff:g id="preference_key">pref_key_autoplay</xliff:g></string>
-    <string name="pref_key_allow_autoplay_audio_video" translatable="false"><xliff:g id="preference_key">pref_key_allow_audio_video_autoplay</xliff:g></string>
-    <string name="pref_key_block_autoplay_audio_only" translatable="false"><xliff:g id="preference_key">pref_key_block_autoplay_audio_only</xliff:g></string>
-    <string name="pref_key_block_autoplay_audio_video" translatable="false"><xliff:g id="preference_key">pref_key_block_audio_video_autoplay</xliff:g></string>
+
     <string name="pref_key_tool_tip" translatable="false"><xliff:g id="preference_key">pref_key_tool_tip</xliff:g></string>
 
     <string name="pref_key_performance_block_webfonts" translatable="false"><xliff:g id="preference_key">pref_performance_block_webfonts</xliff:g></string>
@@ -73,9 +69,8 @@
 
     <string name="pref_key_category_security" translatable="false"><xliff:g id="preference_key">security_category</xliff:g></string>
 
-    <string name="pref_key_homescreen_tips" translatable="false">
-        <xliff:g id="preference_key">use_homescreen_tips</xliff:g>
-    </string>
+    <string name="pref_key_search_widget_installed" translatable="false"><xliff:g id="preference_key">pref_key_search_widget_installed</xliff:g></string>
+    <string name="pref_key_clear_browsing_sessions" translatable="false"><xliff:g id="preference_key">pref_key_clear_browsing_sessions</xliff:g></string>
 
     <string name="pref_key_screen_exceptions" translatable="false">
         <xliff:g id="preference_key">pref_screen_exceptions</xliff:g>
@@ -87,8 +82,27 @@
     <string name="pref_key_dark_theme" translatable="false">pref_key_dark_theme</string>
     <string name="pref_key_default_theme" translatable="false">pref_key_default_theme</string>
 
-    <!-- Opened tabs counter used to trigger erase tabs CFR -->
-    <string name="number_of_opened_tabs" translatable="false">number_of_opened_tabs</string>
+    <!-- Site Permissions Settings -->
+    <string name="pref_key_allow_autoplay_audio_video" translatable="false"><xliff:g id="preference_key">pref_key_allow_autoplay_audio_video</xliff:g></string>
+    <string name="pref_key_block_autoplay_audio_only" translatable="false"><xliff:g id="preference_key">pref_key_block_autoplay_audio_only</xliff:g></string>
+    <string name="pref_key_block_autoplay_audio_video" translatable="false"><xliff:g id="preference_key">pref_key_block_autoplay_audio_video</xliff:g></string>
+    <string name="pref_key_ask_to_allow" translatable="false"><xliff:g id="preference_key">pref_key_ask_to_allow</xliff:g></string>
+    <string name="pref_key_blocked" translatable="false"><xliff:g id="preference_key">pref_key_blocked</xliff:g></string>
+    <string name="pref_key_allowed" translatable="false"><xliff:g id="preference_key">pref_key_allowed</xliff:g></string>
+
+    <string name="pref_key_site_permissions" translatable="false"><xliff:g id="preference_key">pref_key_privacy_site_permissions</xliff:g></string>
+    <string name="pref_key_autoplay" translatable="false"><xliff:g id="preference_key">pref_key_autoplay</xliff:g></string>
+    <string name="pref_key_browser_feature_media_key_system_access" translatable="false"><xliff:g id="preference_key">pref_key_browser_feature_media_key_system_access</xliff:g></string>
+    <string name="pref_key_phone_feature_camera" translatable="false"><xliff:g id="preference_key">pref_key_phone_feature_camera</xliff:g></string>
+    <string name="pref_key_phone_feature_location" translatable="false"><xliff:g id="preference_key">pref_key_phone_feature_location</xliff:g></string>
+    <string name="pref_key_phone_feature_microphone" translatable="false"><xliff:g id="preference_key">pref_key_phone_feature_microphone</xliff:g></string>
+    <string name="pref_key_phone_feature_notification" translatable="false"><xliff:g id="preference_key">pref_key_phone_feature_notification</xliff:g></string>
+
+    <!-- OnBoarding Step -->
+    <string name="pref_key_onboarding_step" translatable="false"><xliff:g id="preference_key">pref_key_onboarding_step</xliff:g></string>
+    <string name="pref_key_first_screen" translatable="false"><xliff:g id="preference_key">pref_key_first_screen</xliff:g></string>
+    <string name="pref_key_second_screen" translatable="false"><xliff:g id="preference_key">pref_key_second_screen</xliff:g></string>
+    <string name="firstrun_shown" translatable="false"><xliff:g id="preference_key">firstrun_shown</xliff:g></string>
 
     <string name="pref_key_swipe_toolbar_switch_tabs" translatable="false"><xliff:g id="preference_key">pref_key_swipe_toolbar_switch_tabs</xliff:g></string>
 </resources>

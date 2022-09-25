@@ -22,6 +22,7 @@ import org.mozilla.focus.GleanMetrics.Autocomplete
 import org.mozilla.focus.R
 import org.mozilla.focus.databinding.FragmentAutocompleteAddDomainBinding
 import org.mozilla.focus.ext.requireComponents
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.settings.BaseSettingsLikeFragment
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.telemetry.TelemetryWrapper
@@ -38,11 +39,6 @@ class AutocompleteAddFragment : BaseSettingsLikeFragment(), CoroutineScope {
     private var _binding: FragmentAutocompleteAddDomainBinding? = null
     private val binding get() = _binding!!
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
-    }
-
     override fun onResume() {
         super.onResume()
 
@@ -50,13 +46,13 @@ class AutocompleteAddFragment : BaseSettingsLikeFragment(), CoroutineScope {
             job = Job()
         }
 
-        updateTitle(R.string.preference_autocomplete_title_add)
+        showToolbar(getString(R.string.preference_autocomplete_title_add))
     }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentAutocompleteAddDomainBinding.inflate(inflater, container, false)
         return binding.root
@@ -78,16 +74,13 @@ class AutocompleteAddFragment : BaseSettingsLikeFragment(), CoroutineScope {
         _binding = null
     }
 
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.menu_autocomplete_add, menu)
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+        menuInflater.inflate(R.menu.menu_autocomplete_add, menu)
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.save) {
-
-            val domain = binding.domainView.text.toString()
-                .trim()
-                .lowercase()
+    override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
+        R.id.save -> {
+            val domain = binding.domainView.text.toString().trim()
 
             launch(IO) {
                 val domains = CustomDomains.load(requireActivity())
@@ -105,11 +98,10 @@ class AutocompleteAddFragment : BaseSettingsLikeFragment(), CoroutineScope {
                     }
                 }
             }
-
-            return true
+            true
         }
-
-        return super.onOptionsItemSelected(item)
+        // other options are not handled by this menu provider
+        else -> false
     }
 
     private fun saveDomainAndClose(context: Context, domain: String) {
@@ -123,8 +115,8 @@ class AutocompleteAddFragment : BaseSettingsLikeFragment(), CoroutineScope {
 
         requireComponents.appStore.dispatch(
             AppAction.NavigateUp(
-                requireComponents.store.state.selectedTabId
-            )
+                requireComponents.store.state.selectedTabId,
+            ),
         )
     }
 }

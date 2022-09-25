@@ -19,6 +19,7 @@ import mozilla.components.browser.state.state.SessionState
 import org.mozilla.focus.R
 import org.mozilla.focus.databinding.FragmentStudiesBinding
 import org.mozilla.focus.ext.components
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.settings.BaseSettingsLikeFragment
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.utils.SupportUtils
@@ -32,11 +33,11 @@ class StudiesFragment : BaseSettingsLikeFragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentStudiesBinding.inflate(inflater, container, false)
         viewModel = ViewModelProvider(
-            this
+            this,
         ).get(StudiesViewModel::class.java)
         setLearnMore()
         setStudiesSwitch()
@@ -47,7 +48,7 @@ class StudiesFragment : BaseSettingsLikeFragment() {
 
     override fun onStart() {
         super.onStart()
-        updateTitle(R.string.preference_studies)
+        showToolbar(getString(R.string.preference_studies))
     }
 
     private fun setLearnMore() {
@@ -87,7 +88,7 @@ class StudiesFragment : BaseSettingsLikeFragment() {
             url = SupportUtils.getGenericSumoURLForTopic(SupportUtils.SumoTopic.STUDIES),
             source = SessionState.Source.Internal.Menu,
             selectTab = true,
-            private = true
+            private = true,
         )
         requireContext().components.appStore.dispatch(AppAction.OpenTab(tabId))
     }
@@ -104,14 +105,14 @@ class StudiesFragment : BaseSettingsLikeFragment() {
         binding.studiesSwitch.setOnClickListener {
             val builder = AlertDialog.Builder(requireContext())
                 .setPositiveButton(
-                    R.string.action_ok
+                    R.string.action_ok,
                 ) { dialog, _ ->
                     viewModel.setStudiesState(binding.studiesSwitch.isChecked)
                     dialog.dismiss()
                     quitTheApp()
                 }
                 .setNegativeButton(
-                    R.string.action_cancel
+                    R.string.action_cancel,
                 ) { dialog, _ ->
                     binding.studiesSwitch.isChecked = !binding.studiesSwitch.isChecked
                     setStudiesTitleByState(binding.studiesSwitch.isChecked)
@@ -140,7 +141,7 @@ class StudiesFragment : BaseSettingsLikeFragment() {
             viewLifecycleOwner,
             { studies ->
                 binding.studiesList.studiesAdapter.submitList(studies)
-            }
+            },
         )
 
         viewModel.studiesState.observe(
@@ -148,7 +149,7 @@ class StudiesFragment : BaseSettingsLikeFragment() {
             { state ->
                 binding.studiesSwitch.isChecked = state
                 setStudiesTitleByState(state)
-            }
+            },
         )
     }
 

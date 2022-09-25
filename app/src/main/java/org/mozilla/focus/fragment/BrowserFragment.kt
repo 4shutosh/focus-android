@@ -19,7 +19,10 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceManager
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -51,6 +54,7 @@ import mozilla.components.lib.crash.Crash
 import mozilla.components.service.glean.private.NoExtras
 import mozilla.components.support.base.feature.UserInteractionHandler
 import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
+import mozilla.components.support.ktx.android.view.exitImmersiveMode
 import mozilla.components.support.utils.Browsers
 import org.mozilla.focus.GleanMetrics.Browser
 import org.mozilla.focus.GleanMetrics.Downloads
@@ -74,7 +78,6 @@ import org.mozilla.focus.ext.disableDynamicBehavior
 import org.mozilla.focus.ext.enableDynamicBehavior
 import org.mozilla.focus.ext.ifCustomTab
 import org.mozilla.focus.ext.isCustomTab
-import org.mozilla.focus.ext.isMultiTabsEnabled
 import org.mozilla.focus.ext.requireComponents
 import org.mozilla.focus.ext.settings
 import org.mozilla.focus.ext.showAsFixed
@@ -82,6 +85,7 @@ import org.mozilla.focus.ext.titleOrDomain
 import org.mozilla.focus.menu.browser.DefaultBrowserMenu
 import org.mozilla.focus.open.OpenWithFragment
 import org.mozilla.focus.session.ui.TabsPopup
+import org.mozilla.focus.settings.permissions.permissionoptions.SitePermissionOptionsStorage
 import org.mozilla.focus.settings.privacy.ConnectionDetailsPanel
 import org.mozilla.focus.settings.privacy.TrackingProtectionPanel
 import org.mozilla.focus.state.AppAction
@@ -123,7 +127,9 @@ class BrowserFragment :
 
     private val toolbarIntegration = ViewBoundFeatureWrapper<BrowserToolbarIntegration>()
 
-    private lateinit var trackingProtectionPanel: TrackingProtectionPanel
+    private var trackingProtectionPanel: TrackingProtectionPanel? = null
+    private lateinit var requestPermissionLauncher: ActivityResultLauncher<Array<String>>
+    private var tabsPopup: TabsPopup? = null
 
     /**
      * The ID of the tab associated with this fragment.
@@ -139,6 +145,29 @@ class BrowserFragment :
         get() = requireComponents.store.state.findTabOrCustomTab(tabId)
             // Workaround for tab not existing temporarily.
             ?: createTab("about:blank")
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestPermissionLauncher =
+            registerForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions(),
+            ) { permissionsResult ->
+                val grandResults = ArrayList<Int>()
+                permissionsResult.entries.forEach {
+                    val isGranted = it.value
+                    if (isGranted) {
+                        grandResults.add(PackageManager.PERMISSION_GRANTED)
+                    } else {
+                        grandResults.add(PackageManager.PERMISSION_DENIED)
+                    }
+                }
+                val feature = sitePermissionsFeature.get()
+                feature?.onPermissionsResult(
+                    permissionsResult.keys.toTypedArray(),
+                    grandResults.toIntArray(),
+                )
+            }
+    }
 
     @Suppress("LongMethod", "ComplexMethod")
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -158,9 +187,10 @@ class BrowserFragment :
             FindInPageIntegration(
                 components.store,
                 binding.findInPage,
-                binding.engineView
+                binding.engineView,
             ),
-            this, view
+            this,
+            view,
         )
 
         fullScreenIntegration.set(
@@ -172,16 +202,17 @@ class BrowserFragment :
                 requireContext().settings,
                 binding.browserToolbar,
                 binding.statusBarBackground,
-                binding.engineView
+                binding.engineView,
             ),
-            this, view
+            this,
+            view,
         )
 
         pictureInPictureFeature = PictureInPictureFeature(
             store = components.store,
             activity = requireActivity(),
             crashReporting = components.crashReporter,
-            tabId = tabId
+            tabId = tabId,
         )
 
         contextMenuFeature.set(
@@ -194,14 +225,15 @@ class BrowserFragment :
                     components.contextMenuUseCases,
                     components.appLinksUseCases,
                     view,
-                    FocusSnackbarDelegate(view)
+                    FocusSnackbarDelegate(view),
                 ),
                 binding.engineView,
                 requireComponents.contextMenuUseCases,
                 tabId,
-                additionalNote = { hitResult -> getAdditionalNote(hitResult) }
+                additionalNote = { hitResult -> getAdditionalNote(hitResult) },
             ),
-            this, view
+            this,
+            view,
         )
 
         sessionFeature.set(
@@ -209,9 +241,10 @@ class BrowserFragment :
                 components.store,
                 components.sessionUseCases.goBack,
                 binding.engineView,
-                tab.id
+                tab.id,
             ),
-            this, view
+            this,
+            view,
         )
 
         promptFeature.set(
@@ -229,12 +262,13 @@ class BrowserFragment :
                                     true -> PackageManager.PERMISSION_GRANTED
                                     false -> PackageManager.PERMISSION_DENIED
                                 }
-                            }.toIntArray()
+                            }.toIntArray(),
                         )
                     }
-                }
+                },
             ),
-            this, view
+            this,
+            view,
         )
 
         downloadsFeature.set(
@@ -243,10 +277,11 @@ class BrowserFragment :
                 components.store,
                 components.downloadsUseCases,
                 fragmentManager = childFragmentManager,
+                tabId = tabId,
                 downloadManager = FetchDownloadManager(
                     requireContext().applicationContext,
                     components.store,
-                    DownloadService::class
+                    DownloadService::class,
                 ),
                 onNeedToRequestPermissions = { permissions ->
                     requestInPlacePermissions(permissions) { result ->
@@ -257,15 +292,16 @@ class BrowserFragment :
                                     true -> PackageManager.PERMISSION_GRANTED
                                     false -> PackageManager.PERMISSION_DENIED
                                 }
-                            }.toIntArray()
+                            }.toIntArray(),
                         )
                     }
                 },
                 onDownloadStopped = { state, _, status ->
                     handleDownloadStopped(state, status)
-                }
+                },
             ),
-            this, view
+            this,
+            view,
         )
 
         shareDownloadFeature.set(
@@ -273,9 +309,10 @@ class BrowserFragment :
                 context = requireContext().applicationContext,
                 httpClient = components.client,
                 store = components.store,
-                tabId = tab.id
+                tabId = tab.id,
             ),
-            this, view
+            this,
+            view,
         )
 
         appLinksFeature.set(
@@ -285,10 +322,10 @@ class BrowserFragment :
                 sessionId = tabId,
                 fragmentManager = parentFragmentManager,
                 launchInApp = { requireContext().settings.openLinksInExternalApp },
-                loadUrlUseCase = requireContext().components.sessionUseCases.loadUrl
+                loadUrlUseCase = requireContext().components.sessionUseCases.loadUrl,
             ),
             owner = this,
-            view = view
+            view = view,
         )
 
         topSitesFeature.set(
@@ -299,12 +336,12 @@ class BrowserFragment :
                     TopSitesConfig(
                         totalSites = TOP_SITES_MAX_LIMIT,
                         frecencyConfig = null,
-                        providerConfig = null
+                        providerConfig = null,
                     )
-                }
+                },
             ),
             owner = this,
-            view = view
+            view = view,
         )
 
         customizeToolbar()
@@ -324,18 +361,18 @@ class BrowserFragment :
             windowFeature.set(
                 feature = WindowFeature(
                     store = components.store,
-                    tabsUseCases = components.tabsUseCases
+                    tabsUseCases = components.tabsUseCases,
                 ),
                 owner = this,
-                view = view
+                view = view,
             )
         }
 
         // Feature that handles MediaSession state changes
         fullScreenMediaSessionFeature.set(
-            feature = MediaSessionFullscreenFeature(requireActivity(), requireComponents.store),
+            feature = MediaSessionFullscreenFeature(requireActivity(), requireComponents.store, tryGetCustomTabId()),
             owner = this,
-            view = view
+            view = view,
         )
 
         setSitePermissions(view)
@@ -346,23 +383,26 @@ class BrowserFragment :
             feature = SitePermissionsFeature(
                 context = requireContext(),
                 fragmentManager = parentFragmentManager,
-                onNeedToRequestPermissions = {
-                    // This it will be always empty because we are not asking for user input
+                onNeedToRequestPermissions = { permissions ->
+                    if (SitePermissionOptionsStorage(requireContext()).isSitePermissionNotBlocked(permissions)) {
+                        requestPermissionLauncher.launch(permissions)
+                    }
                 },
                 onShouldShowRequestPermissionRationale = {
                     // Since we don't request permissions this it will not be called
                     false
                 },
-                sitePermissionsRules = requireComponents.settings.getSitePermissionsSettingsRules(),
+                sitePermissionsRules = SitePermissionOptionsStorage(requireContext()).getSitePermissionsSettingsRules(),
                 sessionId = tabId,
-                store = requireComponents.store
+                store = requireComponents.store,
+                shouldShowDoNotAskAgainCheckBox = false,
             ),
             owner = this,
-            view = rootView
+            view = rootView,
         )
-        if (requireComponents.appStore.state.autoplayRulesChanged) {
+        if (requireComponents.appStore.state.sitePermissionOptionChange) {
             requireComponents.sessionUseCases.reload(tabId)
-            requireComponents.appStore.dispatch(AppAction.AutoplayChange(false))
+            requireComponents.appStore.dispatch(AppAction.SitePermissionOptionChange(false))
         }
     }
 
@@ -373,6 +413,13 @@ class BrowserFragment :
                 disableDynamicBehavior(binding.engineView)
                 showAsFixed(requireContext(), binding.engineView)
             }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(enabled: Boolean) {
+        pictureInPictureFeature?.onPictureInPictureModeChanged(enabled)
+        if (lifecycle.currentState == Lifecycle.State.CREATED) {
+            onBackPressed()
         }
     }
 
@@ -398,7 +445,7 @@ class BrowserFragment :
             ::showAddToHomescreenDialog,
             ::showFindInPageBar,
             ::openSelectBrowser,
-            ::openInBrowser
+            ::openInBrowser,
         )
 
         if (tab.ifCustomTab()?.config == null) {
@@ -407,9 +454,9 @@ class BrowserFragment :
                 appStore = requireComponents.appStore,
                 store = requireComponents.store,
                 isPinningSupported = ShortcutManagerCompat.isRequestPinShortcutSupported(
-                    requireContext()
+                    requireContext(),
                 ),
-                onItemTapped = { controller.handleMenuInteraction(it) }
+                onItemTapped = { controller.handleMenuInteraction(it) },
             )
             binding.browserToolbar.display.menuBuilder = browserMenu.menuBuilder
         }
@@ -425,10 +472,10 @@ class BrowserFragment :
                 sessionUseCases = requireComponents.sessionUseCases,
                 onUrlLongClicked = ::onUrlLongClicked,
                 eraseActionListener = { erase(shouldEraseAllTabs = true) },
-                tabCounterListener = ::tabCounterListener
+                tabCounterListener = ::tabCounterListener,
             ),
             owner = this,
-            view = binding.browserToolbar
+            view = binding.browserToolbar,
         )
     }
 
@@ -473,7 +520,7 @@ class BrowserFragment :
 
         // This fragment might get destroyed before the user left immersive mode (e.g. by opening another URL from an
         // app). In this case let's leave immersive mode now when the fragment gets destroyed.
-        fullScreenIntegration.get()?.exitImmersiveModeIfNeeded()
+        requireActivity().exitImmersiveMode()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -532,7 +579,7 @@ class BrowserFragment :
 
     private fun handleDownloadStopped(
         state: DownloadState,
-        status: DownloadState.Status
+        status: DownloadState.Status,
     ) {
         val extension =
             MimeTypeMap.getFileExtensionFromUrl(URLEncoder.encode(state.filePath, "utf-8"))
@@ -561,24 +608,24 @@ class BrowserFragment :
 
     private fun showDownloadCompletedSnackbar(
         state: DownloadState,
-        extension: String?
+        extension: String?,
     ) {
         val snackbar = FocusSnackbar.make(
             requireView(),
-            Snackbar.LENGTH_LONG
+            Snackbar.LENGTH_LONG,
         )
 
         snackbar.setText(
             String.format(
                 requireContext().getString(R.string.download_snackbar_finished),
-                state.fileName
-            )
+                state.fileName,
+            ),
         )
 
         snackbar.setAction(getString(R.string.download_snackbar_open)) {
             val opened = AbstractFetchDownloadService.openFile(
                 applicationContext = requireContext().applicationContext,
-                download = state
+                download = state,
             )
 
             if (!opened) {
@@ -586,14 +633,14 @@ class BrowserFragment :
                     context,
                     getString(
                         mozilla.components.feature.downloads.R.string.mozac_feature_downloads_open_not_supported1,
-                        extension
+                        extension,
                     ),
-                    Toast.LENGTH_LONG
+                    Toast.LENGTH_LONG,
                 ).show()
             }
 
             Downloads.openButtonTapped.record(
-                Downloads.OpenButtonTappedExtra(fileExtension = extension, openSuccessful = opened)
+                Downloads.OpenButtonTappedExtra(fileExtension = extension, openSuccessful = opened),
             )
         }
 
@@ -615,13 +662,13 @@ class BrowserFragment :
             tab.content.url,
             tab.content.titleOrDomain,
             tab.trackingProtection.enabled,
-            requestDesktop = requestDesktop
+            requestDesktop = requestDesktop,
         )
 
         try {
             addToHomescreenDialogFragment.show(
                 fragmentManager,
-                AddToHomescreenDialogFragment.FRAGMENT_TAG
+                AddToHomescreenDialogFragment.FRAGMENT_TAG,
             )
         } catch (e: IllegalStateException) {
             // It can happen that at this point in time the activity is already in the background
@@ -634,9 +681,27 @@ class BrowserFragment :
     override fun onResume() {
         super.onResume()
 
+        updateEngineColorScheme()
+
+        // Hide status bar background if the parent activity can be casted to MainActivity
+        (requireActivity() as? MainActivity)?.hideStatusBarBackground()
         StatusBarUtils.getStatusBarHeight(binding.statusBarBackground) { statusBarHeight ->
             binding.statusBarBackground.layoutParams.height = statusBarHeight
         }
+    }
+
+    private fun updateEngineColorScheme() {
+        val preferredColorScheme = requireComponents.settings.getPreferredColorScheme()
+        if (requireComponents.engine.settings.preferredColorScheme != preferredColorScheme) {
+            requireComponents.engine.settings.preferredColorScheme = preferredColorScheme
+            requireComponents.sessionUseCases.reload()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        tabsPopup?.dismiss()
+        trackingProtectionPanel?.hide()
     }
 
     override fun onHomePressed() = pictureInPictureFeature?.onHomePressed() ?: false
@@ -655,7 +720,7 @@ class BrowserFragment :
         } else {
             if (tab.source is SessionState.Source.External || tab.isCustomTab()) {
                 Browser.backButtonPressed.record(
-                    Browser.BackButtonPressedExtra("erase_to_external_app")
+                    Browser.BackButtonPressedExtra("erase_to_external_app"),
                 )
                 TelemetryWrapper.eraseBackToAppEvent()
 
@@ -675,7 +740,7 @@ class BrowserFragment :
             } else {
                 // Just go back to the home screen.
                 Browser.backButtonPressed.record(
-                    Browser.BackButtonPressedExtra("erase_to_home")
+                    Browser.BackButtonPressedExtra("erase_to_home"),
                 )
 
                 TelemetryWrapper.eraseBackToHomeEvent()
@@ -689,15 +754,12 @@ class BrowserFragment :
 
     fun erase(shouldEraseAllTabs: Boolean = false) {
         if (shouldEraseAllTabs) {
+            requireComponents.appStore.dispatch(AppAction.NavigateUp(null))
             requireComponents.tabsUseCases.removeAllTabs()
         } else {
             requireComponents.tabsUseCases.removeTab(tab.id)
+            requireComponents.appStore.dispatch(AppAction.NavigateUp(requireComponents.store.state.selectedTabId))
         }
-        requireComponents.appStore.dispatch(
-            AppAction.NavigateUp(
-                requireComponents.store.state.selectedTabId
-            )
-        )
     }
 
     private fun shareCurrentUrl() {
@@ -715,8 +777,8 @@ class BrowserFragment :
             IntentUtils.getIntentChooser(
                 context = requireContext(),
                 intent = shareIntent,
-                chooserTitle = getString(R.string.share_dialog_title)
-            )
+                chooserTitle = getString(R.string.share_dialog_title),
+            ),
         )
     }
 
@@ -726,13 +788,7 @@ class BrowserFragment :
 
         TelemetryWrapper.openFullBrowser()
 
-        if (requireComponents.experiments.isMultiTabsEnabled) {
-            requireComponents.customTabsUseCases.migrate(tab.id)
-        } else {
-            // A Middleware will take care of either opening a new tab for this URL or reusing an
-            // already existing tab.
-            requireComponents.tabsUseCases.addTab(tab.content.url)
-        }
+        requireComponents.customTabsUseCases.migrate(tab.id)
 
         val intent = Intent(context, MainActivity::class.java)
         intent.action = Intent.ACTION_MAIN
@@ -746,20 +802,21 @@ class BrowserFragment :
 
     internal fun edit() {
         requireComponents.appStore.dispatch(
-            AppAction.EditAction(tab.id)
+            AppAction.EditAction(tab.id),
         )
     }
 
     private fun tabCounterListener() {
         val openedTabs = requireComponents.store.state.tabs.size
 
-        val tabsPopup = TabsPopup(binding.browserToolbar, requireComponents)
-        tabsPopup.showAsDropDown(
-            binding.browserToolbar,
-            0,
-            0,
-            Gravity.END
-        )
+        tabsPopup = TabsPopup(binding.browserToolbar, requireComponents).also { currentTabsPopup ->
+            currentTabsPopup.showAsDropDown(
+                binding.browserToolbar,
+                0,
+                0,
+                Gravity.END,
+            )
+        }
 
         TabCount.sessionButtonTapped.record(TabCount.SessionButtonTappedExtra(openedTabs))
 
@@ -775,15 +832,16 @@ class BrowserFragment :
         val browsers = Browsers.forUrl(requireContext(), tab.content.url)
 
         val apps = browsers.installedBrowsers.filterNot { it.packageName == requireContext().packageName }
-        val store = if (browsers.hasFirefoxBrandedBrowserInstalled)
+        val store = if (browsers.hasFirefoxBrandedBrowserInstalled) {
             null
-        else
+        } else {
             InstallFirefoxActivity.resolveAppStore(requireContext())
+        }
 
         val fragment = OpenWithFragment.newInstance(
             apps.toTypedArray(),
             tab.content.url,
-            store
+            store,
         )
         @Suppress("DEPRECATION")
         fragment.show(requireFragmentManager(), OpenWithFragment.FRAGMENT_TAG)
@@ -803,7 +861,7 @@ class BrowserFragment :
             PreferenceManager.getDefaultSharedPreferences(context).edit()
                 .putBoolean(
                     requireContext().getString(R.string.has_requested_desktop),
-                    true
+                    true,
                 ).apply()
         }
         requireComponents.sessionUseCases.requestDesktopSite(enabled, tab.id)
@@ -823,13 +881,12 @@ class BrowserFragment :
                     .updateTrackingProtectionPolicy(
                         source = EngineSharedPreferencesListener.ChangeSource.PANEL.source,
                         tracker = tracker,
-                        isEnabled = isEnabled
+                        isEnabled = isEnabled,
                     )
                 reloadCurrentTab()
             },
-            showConnectionInfo = ::showConnectionInfo
-        )
-        trackingProtectionPanel.show()
+            showConnectionInfo = ::showConnectionInfo,
+        ).also { currentEtp -> currentEtp.show() }
     }
 
     private fun reloadCurrentTab() {
@@ -842,9 +899,9 @@ class BrowserFragment :
             tabTitle = tab.content.title,
             tabUrl = tab.content.url,
             isConnectionSecure = tab.content.securityInfo.secure,
-            goBack = { trackingProtectionPanel.show() }
+            goBack = { trackingProtectionPanel?.show() },
         )
-        trackingProtectionPanel.hide()
+        trackingProtectionPanel?.hide()
         connectionInfoPanel.show()
     }
 
@@ -862,8 +919,8 @@ class BrowserFragment :
         TrackingProtection.hasEverChangedEtp.set(true)
         TrackingProtection.trackingProtectionChanged.record(
             TrackingProtection.TrackingProtectionChangedExtra(
-                isEnabled = enable
-            )
+                isEnabled = enable,
+            ),
         )
     }
 

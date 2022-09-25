@@ -12,6 +12,7 @@ import org.mozilla.focus.R
 import org.mozilla.focus.ext.application
 import org.mozilla.focus.ext.getPreferenceKey
 import org.mozilla.focus.ext.requireComponents
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.settings.BaseSettingsFragment
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.state.Screen
@@ -35,7 +36,7 @@ class AdvancedSettingsFragment :
 
         preferenceManager.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
 
-        updateTitle(R.string.preference_category_advanced)
+        showToolbar(getString(R.string.preference_category_advanced))
     }
 
     override fun onPause() {
@@ -51,13 +52,13 @@ class AdvancedSettingsFragment :
                     sharedPreferences.getBoolean(key, false)
 
                 AdvancedSettings.remoteDebugSettingChanged.record(
-                    AdvancedSettings.RemoteDebugSettingChangedExtra(sharedPreferences.all[key] as Boolean)
+                    AdvancedSettings.RemoteDebugSettingChangedExtra(sharedPreferences.all[key] as Boolean),
                 )
             }
 
             getString(R.string.pref_key_open_links_in_external_app) ->
                 AdvancedSettings.openLinksSettingChanged.record(
-                    AdvancedSettings.OpenLinksSettingChangedExtra(sharedPreferences.all[key] as Boolean)
+                    AdvancedSettings.OpenLinksSettingChangedExtra(sharedPreferences.all[key] as Boolean),
                 )
             getString(R.string.pref_key_leakcanary) -> {
                 context?.application?.updateLeakCanaryState(sharedPreferences.all[key] as Boolean)

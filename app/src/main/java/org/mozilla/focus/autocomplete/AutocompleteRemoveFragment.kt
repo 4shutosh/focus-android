@@ -18,6 +18,7 @@ import mozilla.components.browser.domains.CustomDomains
 import org.mozilla.focus.GleanMetrics.Autocomplete
 import org.mozilla.focus.R
 import org.mozilla.focus.ext.requireComponents
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.telemetry.TelemetryWrapper
 import kotlin.coroutines.CoroutineContext
@@ -27,16 +28,16 @@ class AutocompleteRemoveFragment : AutocompleteListFragment(), CoroutineScope {
     override val coroutineContext: CoroutineContext
         get() = job + Main
 
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.menu_autocomplete_remove, menu)
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+        menuInflater.inflate(R.menu.menu_autocomplete_remove, menu)
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+    override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
         R.id.remove -> {
             removeSelectedDomains(requireActivity().applicationContext)
             true
         }
-        else -> super.onOptionsItemSelected(item)
+        else -> false
     }
 
     private fun removeSelectedDomains(context: Context) {
@@ -50,7 +51,7 @@ class AutocompleteRemoveFragment : AutocompleteListFragment(), CoroutineScope {
                 }
 
                 requireComponents.appStore.dispatch(
-                    AppAction.NavigateUp(requireComponents.store.state.selectedTabId)
+                    AppAction.NavigateUp(requireComponents.store.state.selectedTabId),
                 )
             }
         }
@@ -65,7 +66,7 @@ class AutocompleteRemoveFragment : AutocompleteListFragment(), CoroutineScope {
             job = Job()
         }
 
-        updateTitle(R.string.preference_autocomplete_title_remove)
+        showToolbar(getString(R.string.preference_autocomplete_title_remove))
     }
 
     override fun onPause() {

@@ -13,7 +13,7 @@ import org.mozilla.focus.activity.robots.homeScreen
 import org.mozilla.focus.activity.robots.searchScreen
 import org.mozilla.focus.helpers.FeatureSettingsHelper
 import org.mozilla.focus.helpers.MainActivityFirstrunTestRule
-import org.mozilla.focus.helpers.TestHelper.createMockResponseFromAsset
+import org.mozilla.focus.helpers.MockWebServerHelper
 import org.mozilla.focus.helpers.TestHelper.exitToTop
 import org.mozilla.focus.helpers.TestHelper.getStringResource
 import org.mozilla.focus.testAnnotations.SmokeTest
@@ -35,9 +35,11 @@ class SafeBrowsingTest {
     @Before
     fun setUp() {
         featureSettingsHelper.setCfrForTrackingProtectionEnabled(false)
-        featureSettingsHelper.setNumberOfTabsOpened(4)
-        webServer = MockWebServer()
-        webServer.start()
+        featureSettingsHelper.setSearchWidgetDialogEnabled(false)
+        webServer = MockWebServer().apply {
+            dispatcher = MockWebServerHelper.AndroidAssetDispatcher()
+            start()
+        }
     }
 
     @After
@@ -125,24 +127,13 @@ class SafeBrowsingTest {
         }.openSiteSecurityInfoSheet {
             verifySiteConnectionInfoIsSecure(true)
         }.closeSecurityInfoSheet {
-        }.openSearchBar {
+        }.clearBrowsingData {}
+        searchScreen {
         }.loadPage(insecurePageUrl) {
             verifyPageURL(insecurePageUrl)
             verifySiteSecurityIndicatorShown()
         }.openSiteSecurityInfoSheet {
             verifySiteConnectionInfoIsSecure(false)
         }.closeSecurityInfoSheet { }
-    }
-
-    @Test
-    fun testLocationSharingNotAllowed() {
-        webServer.enqueue(createMockResponseFromAsset("permissionsPage.html"))
-        val permissionsPage = webServer.url("permissionsPage.html").toString()
-
-        searchScreen {
-        }.loadPage(permissionsPage) {
-            clickGetLocationButton()
-            verifyPageContent("No location info")
-        }
     }
 }

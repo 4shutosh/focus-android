@@ -4,6 +4,7 @@
 
 package org.mozilla.focus.activity.robots
 
+import android.os.Build
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
@@ -18,6 +19,7 @@ import org.mozilla.focus.helpers.TestHelper.waitingTime
 class NotificationRobot {
 
     private val NOTIFICATION_SHADE = "com.android.systemui:id/notification_stack_scroller"
+    private val QS_PANEL = "com.android.systemui:id/quick_qs_panel"
 
     fun clearNotifications() {
         if (clearButton.exists()) {
@@ -37,16 +39,46 @@ class NotificationRobot {
     }
 
     fun verifySystemNotificationExists(notificationMessage: String) {
-        val notificationInTray = mDevice.wait(
-            Until.hasObject(
-                By.res(NOTIFICATION_SHADE).hasDescendant(
-                    By.text(notificationMessage)
-                )
-            ),
-            waitingTime
-        )
+        val notification = mDevice.findObject(UiSelector().text(notificationMessage))
+        while (!notification.waitForExists(waitingTime)) {
+            UiScrollable(
+                UiSelector().resourceId(NOTIFICATION_SHADE),
+            ).flingToEnd(1)
+        }
 
-        assertTrue(notificationInTray)
+        assertTrue(notification.exists())
+    }
+
+    fun verifyMediaNotificationExists(notificationMessage: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val notificationInTray = mDevice.wait(
+                Until.hasObject(
+                    By.res(QS_PANEL).hasDescendant(
+                        By.text(notificationMessage),
+                    ),
+                ),
+                waitingTime,
+            )
+
+            assertTrue(notificationInTray)
+        } else {
+            verifySystemNotificationExists(notificationMessage)
+        }
+    }
+
+    fun verifyNotificationGone(notificationMessage: String) {
+        assertTrue(
+            mDevice.findObject(UiSelector().text(notificationMessage))
+                .waitUntilGone(waitingTime),
+        )
+    }
+
+    fun clickMediaNotificationControlButton(action: String) {
+        mediaNotificationControlButton(action).click()
+    }
+
+    fun verifyMediaNotificationButtonState(action: String) {
+        mediaNotificationControlButton(action).waitForExists(waitingTime)
     }
 
     fun verifyDownloadNotification(notificationMessage: String, fileName: String) {
@@ -97,26 +129,31 @@ fun notificationTray(interact: NotificationRobot.() -> Unit): NotificationRobot.
 
 private val eraseBrowsingNotification =
     mDevice.findObject(
-        UiSelector().text(getStringResource(R.string.notification_erase_text))
+        UiSelector().text(getStringResource(R.string.notification_erase_text)),
     )
 
 private val notificationEraseAndOpenButton =
     mDevice.findObject(
-        UiSelector().description(getStringResource(R.string.notification_action_erase_and_open))
+        UiSelector().description(getStringResource(R.string.notification_action_erase_and_open)),
     )
 
 private val notificationOpenButton = mDevice.findObject(
-    UiSelector().description(getStringResource(R.string.notification_action_open))
+    UiSelector().description(getStringResource(R.string.notification_action_open)),
 )
 
 private val notificationTray = UiScrollable(
-    UiSelector().resourceId("com.android.systemui:id/notification_stack_scroller")
-).setAsVerticalList()
+    UiSelector().resourceId("com.android.systemui:id/notification_stack_scroller"),
+)
+    .setAsVerticalList()
 
 private val notificationHeader = mDevice.findObject(
     UiSelector()
         .resourceId("android:id/app_name_text")
-        .textContains(appName)
+        .textContains(appName),
 )
 
-private val clearButton = mDevice.findObject(UiSelector().resourceId("com.android.systemui:id/btn_clear_all"))
+private val clearButton =
+    mDevice.findObject(UiSelector().resourceId("com.android.systemui:id/btn_clear_all"))
+
+private fun mediaNotificationControlButton(action: String) =
+    mDevice.findObject(UiSelector().description(action))

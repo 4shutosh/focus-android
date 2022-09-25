@@ -9,31 +9,41 @@ import android.content.res.Resources
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
-import android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 import mozilla.components.browser.engine.gecko.GeckoEngineView
 import mozilla.components.browser.toolbar.BrowserToolbar
 import mozilla.components.feature.session.FullScreenFeature
+import mozilla.components.support.test.any
 import mozilla.components.support.test.mock
 import org.junit.Test
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.mockito.Mockito.anyInt
+import org.junit.runner.RunWith
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.never
 import org.mockito.Mockito.spy
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mozilla.focus.ext.disableDynamicBehavior
 import org.mozilla.focus.ext.enableDynamicBehavior
 import org.mozilla.focus.ext.hide
 import org.mozilla.focus.ext.showAsFixed
 import org.mozilla.focus.utils.Settings
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 internal class FullScreenIntegrationTest {
     @Test
     fun `WHEN the integration is started THEN start FullScreenFeature`() {
         val feature: FullScreenFeature = mock()
         val integration = FullScreenIntegration(
-            mock(), mock(), null, mock(), mock(), mock(), mock(), mock()
+            mock(),
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         ).apply {
             this.feature = feature
         }
@@ -47,7 +57,14 @@ internal class FullScreenIntegrationTest {
     fun `WHEN the integration is stopped THEN stop FullScreenFeature`() {
         val feature: FullScreenFeature = mock()
         val integration = FullScreenIntegration(
-            mock(), mock(), null, mock(), mock(), mock(), mock(), mock()
+            mock(),
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         ).apply {
             this.feature = feature
         }
@@ -61,7 +78,14 @@ internal class FullScreenIntegrationTest {
     fun `WHEN back is pressed THEN send this to the feature`() {
         val feature: FullScreenFeature = mock()
         val integration = FullScreenIntegration(
-            mock(), mock(), null, mock(), mock(), mock(), mock(), mock()
+            mock(),
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         ).apply {
             this.feature = feature
         }
@@ -79,7 +103,14 @@ internal class FullScreenIntegrationTest {
         doReturn(activityWindow).`when`(activity).window
         doReturn(windowAttributes).`when`(activityWindow).attributes
         val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), mock(), mock(), mock(), mock()
+            activity,
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         )
 
         integration.viewportFitChanged(33)
@@ -96,60 +127,50 @@ internal class FullScreenIntegrationTest {
         doReturn(activityWindow).`when`(activity).window
         doReturn(decorView).`when`(activityWindow).decorView
         val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), mock(), mock(), mock(), mock()
+            activity,
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         )
 
         integration.switchToImmersiveMode()
 
-        verify(activityWindow).addFlags(FLAG_KEEP_SCREEN_ON)
-        verify(decorView).systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        // verify entering immersive mode
+        verify(decorView).systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        verify(decorView).systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        // verify that the immersive mode restoration is set as expected
+        verify(decorView).setOnApplyWindowInsetsListener(any())
     }
 
     @Test
     @Suppress("DEPRECATION")
     fun `GIVEN immersive mode WHEN exitImmersiveModeIfNeeded is called THEN show the system bars`() {
-        val windowAttributes = WindowManager.LayoutParams()
-        // This flag is checked to infer whether already in immersive mode or not
-        windowAttributes.flags = FLAG_KEEP_SCREEN_ON
         val decorView: View = mock()
         val activityWindow: Window = mock()
         val activity: Activity = mock()
         doReturn(activityWindow).`when`(activity).window
         doReturn(decorView).`when`(activityWindow).decorView
-        doReturn(windowAttributes).`when`(activityWindow).attributes
         val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), mock(), mock(), mock(), mock()
+            activity,
+            mock(),
+            null,
+            mock(),
+            mock(),
+            mock(),
+            mock(),
+            mock(),
         )
 
-        integration.exitImmersiveModeIfNeeded()
-
-        verify(activityWindow).clearFlags(FLAG_KEEP_SCREEN_ON)
-        verify(decorView).systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-    }
-
-    @Test
-    @Suppress("DEPRECATION")
-    fun `GIVEN not in immersive mode WHEN exitImmersiveModeIfNeeded is called THEN don't change anything`() {
-        val windowAttributes = WindowManager.LayoutParams()
-        // This flag is checked to infer whether already in immersive mode or not
-        windowAttributes.flags = 0
-        val decorView: View = mock()
-        val activityWindow: Window = mock()
-        val activity: Activity = mock()
-        doReturn(activityWindow).`when`(activity).window
-        doReturn(decorView).`when`(activityWindow).decorView
-        doReturn(windowAttributes).`when`(activityWindow).attributes
-        val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), mock(), mock(), mock(), mock()
-        )
-
-        integration.exitImmersiveModeIfNeeded()
-
-        verify(activityWindow, never()).clearFlags(anyInt())
-        verify(decorView, never()).systemUiVisibility = anyInt()
+        integration.exitImmersiveMode()
+        // Hiding the system bar hides the status and navigation bars.
+        // setSystemUiVisibility will be called twice by WindowInsetsControllerCompat
+        // once for setting the status bar and another for setting the navigation bar
+        verify(decorView, times(2)).systemUiVisibility
+        verify(decorView).setOnApplyWindowInsetsListener(null)
     }
 
     @Test
@@ -160,7 +181,14 @@ internal class FullScreenIntegrationTest {
         val settings: Settings = mock()
         doReturn(true).`when`(settings).isAccessibilityEnabled()
         val integration = FullScreenIntegration(
-            mock(), mock(), null, mock(), settings, toolbar, mock(), engineView
+            mock(),
+            mock(),
+            null,
+            mock(),
+            settings,
+            toolbar,
+            mock(),
+            engineView,
         )
 
         integration.enterBrowserFullscreen()
@@ -178,7 +206,14 @@ internal class FullScreenIntegrationTest {
         val settings: Settings = mock()
         doReturn(false).`when`(settings).isAccessibilityEnabled()
         val integration = FullScreenIntegration(
-            mock(), mock(), null, mock(), settings, toolbar, mock(), engineView
+            mock(),
+            mock(),
+            null,
+            mock(),
+            settings,
+            toolbar,
+            mock(),
+            engineView,
         )
 
         integration.enterBrowserFullscreen()
@@ -201,7 +236,14 @@ internal class FullScreenIntegrationTest {
         val activity: Activity = mock()
         doReturn(resources).`when`(activity).resources
         val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), settings, toolbar, mock(), engineView
+            activity,
+            mock(),
+            null,
+            mock(),
+            settings,
+            toolbar,
+            mock(),
+            engineView,
         )
 
         integration.exitBrowserFullscreen()
@@ -222,7 +264,14 @@ internal class FullScreenIntegrationTest {
         val activity: Activity = mock()
         doReturn(resources).`when`(activity).resources
         val integration = FullScreenIntegration(
-            activity, mock(), null, mock(), settings, toolbar, mock(), engineView
+            activity,
+            mock(),
+            null,
+            mock(),
+            settings,
+            toolbar,
+            mock(),
+            engineView,
         )
 
         integration.exitBrowserFullscreen()
@@ -251,8 +300,15 @@ internal class FullScreenIntegrationTest {
         val statusBar: View = mock()
         val integration = spy(
             FullScreenIntegration(
-                activity, mock(), null, mock(), settings, toolbar, statusBar, engineView
-            )
+                activity,
+                mock(),
+                null,
+                mock(),
+                settings,
+                toolbar,
+                statusBar,
+                engineView,
+            ),
         )
 
         integration.fullScreenChanged(true)
@@ -281,14 +337,21 @@ internal class FullScreenIntegrationTest {
         val statusBar: View = mock()
         val integration = spy(
             FullScreenIntegration(
-                activity, mock(), null, mock(), settings, toolbar, statusBar, engineView
-            )
+                activity,
+                mock(),
+                null,
+                mock(),
+                settings,
+                toolbar,
+                statusBar,
+                engineView,
+            ),
         )
 
         integration.fullScreenChanged(false)
 
         verify(integration).exitBrowserFullscreen()
-        verify(integration).exitImmersiveModeIfNeeded()
+        verify(integration).exitImmersiveMode()
         verify(statusBar).visibility = View.VISIBLE
     }
 }

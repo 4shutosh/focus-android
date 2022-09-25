@@ -67,25 +67,11 @@ class SearchRobot {
         searchBar.longClick()
     }
 
-    fun pasteAndLoadLink() {
-        var currentTries = 0
-        while (currentTries++ < 3) {
-            try {
-                mDevice.findObject(UiSelector().textContains("Paste")).waitForExists(waitingTime)
-                val pasteText = mDevice.findObject(By.textContains("Paste"))
-                pasteText.click()
-                mDevice.pressEnter()
-                break
-            } catch (e: NullPointerException) {
-                longPressSearchBar()
-            }
-        }
-    }
-
     fun clearSearchBar() = clearSearchButton.click()
+
     fun verifySearchSuggestionsContain(title: String) {
         assertTrue(
-            suggestionsList.getChild(UiSelector().textContains(title)).waitForExists(waitingTime)
+            suggestionsList.getChild(UiSelector().textContains(title)).waitForExists(waitingTime),
         )
     }
 
@@ -100,12 +86,30 @@ class SearchRobot {
 
             runWithIdleRes(sessionLoadedIdlingResource) {
                 assertTrue(
-                    BrowserRobot().progressBar.waitUntilGone(waitingTime)
+                    BrowserRobot().progressBar.waitUntilGone(waitingTime),
                 )
                 assertTrue(
                     geckoEngineView.waitForExists(waitingTime) ||
-                        trackingProtectionDialog.waitForExists(waitingTime)
+                        trackingProtectionDialog.waitForExists(waitingTime),
                 )
+            }
+
+            BrowserRobot().interact()
+            return BrowserRobot.Transition()
+        }
+
+        fun pasteAndLoadLink(interact: BrowserRobot.() -> Unit): BrowserRobot.Transition {
+            var currentTries = 0
+            while (currentTries++ < 3) {
+                try {
+                    mDevice.findObject(UiSelector().textContains("Paste")).waitForExists(waitingTime)
+                    val pasteText = mDevice.findObject(By.textContains("Paste"))
+                    pasteText.click()
+                    mDevice.pressEnter()
+                    break
+                } catch (e: NullPointerException) {
+                    SearchRobot().longPressSearchBar()
+                }
             }
 
             BrowserRobot().interact()
@@ -128,24 +132,24 @@ private val toolbar =
 private val searchSuggestionsTitle = mDevice.findObject(
     UiSelector()
         .resourceId("$packageName:id/enable_search_suggestions_title")
-        .enabled(true)
+        .enabled(true),
 )
 
 private val searchSuggestionsButtonYes = mDevice.findObject(
     UiSelector()
         .resourceId("$packageName:id/enable_search_suggestions_button")
-        .enabled(true)
+        .enabled(true),
 )
 
 private val searchSuggestionsButtonNo = mDevice.findObject(
     UiSelector()
         .resourceId("$packageName:id/disable_search_suggestions_button")
-        .enabled(true)
+        .enabled(true),
 )
 
 private val suggestionsList = mDevice.findObject(
     UiSelector()
-        .resourceId("$packageName:id/search_suggestions_view")
+        .resourceId("$packageName:id/search_suggestions_view"),
 )
 
 private val clearSearchButton = mDevice.findObject(UiSelector().resourceId("$packageName:id/mozac_browser_toolbar_clear_view"))

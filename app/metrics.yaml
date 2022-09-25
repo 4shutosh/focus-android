@@ -4,6 +4,10 @@
 ---
 $schema: moz://mozilla.org/schemas/glean/metrics/2-0-0
 
+no_lint:
+  - CATEGORY_GENERIC
+  - COMMON_PREFIX
+
 browser:
   is_default:
     type: boolean
@@ -15,11 +19,12 @@ browser:
       - https://github.com/mozilla-mobile/focus-android/issues/4545
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5065#issuecomment-894328647
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
   default_search_engine:
     type: string
     lifetime: application
@@ -29,11 +34,12 @@ browser:
       - https://github.com/mozilla-mobile/focus-android/issues/4545
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5065#issuecomment-894328647
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
   locale_override:
     type: string
     lifetime: application
@@ -44,11 +50,12 @@ browser:
       - https://github.com/mozilla-mobile/focus-android/issues/4545
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5065#issuecomment-894328647
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - technical
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
   total_uri_count:
     type: counter
     description: |
@@ -113,6 +120,82 @@ browser:
       - android-probes@mozilla.com
     expires: 107
 
+perf.startup:
+  startup_type:
+    type: labeled_counter
+    description: |
+      Indicates how the browser was started. The label is divided into two
+      variables. `state` is how cached the browser is when started. `path` is
+      what code path we are expected to take. Together, they create a combined
+      label: `state_path`. For brevity, the specific states are documented in
+      the [Fenix perf
+      glossary](https://wiki.mozilla.org/index.php?title=Performance/Fenix/Glossary).
+      <br><br>
+      This implementation is intended to be simple, not comprehensive. We list
+      the implications below.
+
+      <br><br>
+      These ways of opening the app undesirably adds events to our primary
+      buckets (non-`unknown` cases):
+      <br>- App switcher cold/warm: `cold/warm_` + duplicates path from
+      previous launch
+      <br>- An Intent is sent internally that's uses `ACTION_MAIN` or
+      `ACTION_VIEW` could be: `*_main/view` (unknown if this ever happens)
+      <br>- A command-line launch uses `ACTION_MAIN` or `ACTION_VIEW` could be:
+      `*_main/view`
+
+      <br><br>
+      These ways of opening the app undesirably do not add their events to our
+      primary buckets:
+      <br>- Close and reopen the app very quickly: no event is recorded.
+
+      <br><br>
+      These ways of opening the app don't affect our primary buckets:
+      <br>- App switcher hot: `hot_unknown`
+      <br>- PWA (all states): `unknown_unknown`
+      <br>- Custom tab: `unknown_view`
+      <br>- Cold start where a service or other non-activity starts the process
+      (not manually tested) - this seems to happen if you have the homescreen
+      widget: `unknown_*`
+      <br>- Another activity is drawn before MainActivity or CustomTabActivity
+      (e.g. widget voice
+      search): `unknown_*`
+
+      <br>
+      In addition to the events above, the `unknown` state may be chosen when we
+      were unable to determine a cause due to implementation details or the API
+      was used incorrectly. We may be able to record the events listed above
+      into different buckets but we kept the implementation simple for now.
+      <br><br>
+      N.B.: for implementation simplicity, we duplicate the logic in app that
+      determines `path` so it's not perfectly accurate. In one way, we record we
+      is intended to happen rather than what actually happened (e.g. the user
+      may click a link so we record VIEW but the app does a MAIN by going to the
+      homescreen because the link was invalid).
+    labels:
+      - cold_main
+      - cold_view
+      - cold_unknown
+      - warm_main
+      - warm_view
+      - warm_unknown
+      - hot_main
+      - hot_view
+      - hot_unknown
+      - unknown_main
+      - unknown_view
+      - unknown_unknown
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7079
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - perf-telemetry-alerts@mozilla.com
+      - mleclair@mozilla.com
+    expires: never
+
 activation:
   activation_id:
     type: uuid
@@ -161,11 +244,12 @@ browser.search:
       - https://github.com/mozilla-mobile/fenix/issues/4967
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/4968#issuecomment-879256443
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
   ad_clicks:
     type: labeled_counter
     description: |
@@ -177,11 +261,12 @@ browser.search:
       - https://github.com/mozilla-mobile/fenix/issues/4967
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/4968#issuecomment-879256443
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
   in_content:
     type: labeled_counter
     description: |
@@ -192,11 +277,12 @@ browser.search:
       - https://github.com/mozilla-mobile/fenix/issues/4967
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/4968#issuecomment-879256443
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 103
+    expires: 119
 
   search_count:
     type: labeled_counter
@@ -232,12 +318,13 @@ mozilla_products:
       - https://github.com/mozilla-mobile/focus-android/issues/5295
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5303
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - technical
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 105
+    expires: 119
   is_fenix_default_browser:
     type: boolean
     lifetime: application
@@ -267,11 +354,12 @@ settings_screen:
       - https://github.com/mozilla-mobile/focus-android/issues/5058
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5096
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 
 autocomplete:
   domain_added:
@@ -361,11 +449,12 @@ shortcuts:
       - https://github.com/mozilla-mobile/focus-android/issues/5056
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5189
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
     unit: shortcut(s)
   shortcut_opened_counter:
     type: counter
@@ -376,11 +465,12 @@ shortcuts:
       - https://github.com/mozilla-mobile/focus-android/issues/5056
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5189
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
   shortcut_added_counter:
     type: counter
     description: |
@@ -390,11 +480,12 @@ shortcuts:
       - https://github.com/mozilla-mobile/focus-android/issues/5056
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5189
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
   shortcut_removed_counter:
     type: labeled_counter
     description: |
@@ -405,11 +496,12 @@ shortcuts:
       - https://github.com/mozilla-mobile/focus-android/issues/5056
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5189
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
     labels:
       - removed_from_browser_menu
       - removed_from_home_screen
@@ -423,11 +515,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 
   tracking_protection_changed:
     type: event
@@ -437,11 +530,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
     extra_keys:
       is_enabled:
         description: The new setting for ETP, true for ON, false for OFF
@@ -473,11 +567,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
     extra_keys:
       source_of_change:
         description: The source of interaction, "Panel" or "Settings"
@@ -499,11 +594,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 
   has_advertising_blocked:
     type: boolean
@@ -514,11 +610,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 
   has_analytics_blocked:
     type: boolean
@@ -529,11 +626,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 
   has_content_blocked:
     type: boolean
@@ -544,11 +642,12 @@ tracking_protection:
       - https://github.com/mozilla-mobile/focus-android/issues/5057
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5163
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 104
+    expires: 119
 pro_tips:
   tip_displayed:
     type: event
@@ -587,23 +686,6 @@ pro_tips:
           The tip code of tip being clicked.
           Can be one of fresh_look_tip, allow_list_tip, request_desktop_tip.
         type: string
-  tips_setting_changed:
-    type: event
-    description: |
-      Display setting for tips has changed.
-    bugs:
-      - https://github.com/mozilla-mobile/focus-android/issues/5541
-    data_reviews:
-      - https://github.com/mozilla-mobile/focus-android/pull/5940
-    data_sensitivity:
-      - interaction
-    notification_emails:
-      - android-probes@mozilla.com
-    expires: 107
-    extra_keys:
-      is_enabled:
-        description: The new setting true for ON, false for OFF
-        type: boolean
 
 preferences:
   user_theme:
@@ -616,11 +698,12 @@ preferences:
       - https://github.com/mozilla-mobile/focus-android/issues/5519
     data_reviews:
       - https://github.com/mozilla-mobile/focus-android/pull/5526
+      - https://github.com/mozilla-mobile/focus-android/pull/7418#issuecomment-1195518264
     data_sensitivity:
       - interaction
     notification_emails:
       - android-probes@mozilla.com
-    expires: 106
+    expires: 119
 
 app_opened:
   from_icons:
@@ -657,7 +740,7 @@ app_opened:
   browse_intent:
     type: event
     description: |
-      The user has opened the app using launcher website shortcut
+      App was opened from a browse intent.
     bugs:
       - https://github.com/mozilla-mobile/focus-android/issues/5547
     data_reviews:
@@ -670,7 +753,7 @@ app_opened:
   text_selection_intent:
     type: event
     description: |
-      The user has opened the app using launcher website shortcut
+      App was opened from a text selection intent.
     bugs:
       - https://github.com/mozilla-mobile/focus-android/issues/5547
     data_reviews:
@@ -683,7 +766,7 @@ app_opened:
   share_intent:
     type: event
     description: |
-      The user has opened the app using launcher website shortcut
+      App was opened from a share intent.
     bugs:
       - https://github.com/mozilla-mobile/focus-android/issues/5547
     data_reviews:
@@ -1508,6 +1591,66 @@ context_menu:
         type: string
 
 onboarding:
+  first_screen_close_button:
+    type: event
+    description: The user has tapped on close button from the first screen.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7500
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7566#issuecomment-1235551604
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+  get_started_button:
+    type: event
+    description: The user has tapped on get started button.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7500
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7566#issuecomment-1235551604
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+  default_browser_button:
+    type: event
+    description: The user has tapped on set as default browser button.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7500
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7566#issuecomment-1235551604
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+  skip_button:
+    type: event
+    description: The user has tapped on skip button.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7500
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7566#issuecomment-1235551604
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+  second_screen_close_button:
+    type: event
+    description: The user has tapped on close button from the second screen.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7500
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7566#issuecomment-1235551604
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
   page_displayed:
     type: event
     description: A page from onboarding has been displayed.
@@ -1742,3 +1885,165 @@ privacy_settings:
           A string containing the new block cookies option the user has chosen:
           yes, third_party_only, third_party_tracker, cross_site, no
         type: string
+nimbus_experiments:
+  nimbus_initial_fetch:
+    type: timespan
+    description: >
+      Measures the time spent to download the nimbus experiments
+    time_unit: millisecond
+    lifetime: application
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/6847
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/6972
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 112
+    data_sensitivity:
+      - technical
+
+metrics:
+  start_reason_process_error:
+    type: boolean
+    description: |
+      The `AppStartReasonProvider.ProcessLifecycleObserver.onCreate` was
+      unexpectedly called twice. We can use this metric to validate our
+      assumptions about how these APIs are called. This probe can be removed
+      once we validate these assumptions.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7079
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - perf-telemetry-alerts@mozilla.com
+      - mleclair@mozilla.com
+    expires: never
+    metadata:
+      tags:
+        - Performance
+  start_reason_activity_error:
+    type: boolean
+    description: |
+      The `AppStartReasonProvider.ActivityLifecycleCallbacks.onActivityCreated`
+      was unexpectedly called twice. We can use this metric to validate our
+      assumptions about how these APIs are called. This probe can be removed
+      once we validate these assumptions.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7079
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - perf-telemetry-alerts@mozilla.com
+      - mleclair@mozilla.com
+    expires: never
+    metadata:
+      tags:
+        - Performance
+  search_widget_installed:
+    type: boolean
+    lifetime: application
+    description: |
+      Whether or not the search widget is installed
+    send_in_pings:
+      - metrics
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7474
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search
+
+search_widget:
+  new_tab_button:
+    type: event
+    description: |
+      A user pressed anywhere from the Focus logo until the start of the
+      microphone icon, opening a new tab search screen.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7474
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search
+  voice_button:
+    type: event
+    description: |
+      A user pressed the microphone icon, opening a new voice search screen.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7474
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search
+  promote_dialog_shown:
+    type: event
+    description: |
+      Promote search widget dialog is shown to the user.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7506
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7657#issuecomment-1252242947
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search
+  add_to_home_screen_button:
+    type: event
+    description: |
+      The user has pressed on add search widget
+      to home screen button from promote dialog.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7506
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7657#issuecomment-1252242947
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search
+  widget_was_added:
+    type: event
+    description: |
+      The user has added successfully the search widget from
+      promote search widget dialog.
+    bugs:
+      - https://github.com/mozilla-mobile/focus-android/issues/7506
+    data_reviews:
+      - https://github.com/mozilla-mobile/focus-android/pull/7657#issuecomment-1252242947
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 119
+    metadata:
+      tags:
+        - Search

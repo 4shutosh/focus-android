@@ -13,8 +13,7 @@ import org.mozilla.focus.R
 import org.mozilla.focus.activity.robots.homeScreen
 import org.mozilla.focus.helpers.FeatureSettingsHelper
 import org.mozilla.focus.helpers.MainActivityFirstrunTestRule
-import org.mozilla.focus.helpers.TestHelper.appContext
-import org.mozilla.focus.helpers.TestHelper.exitToTop
+import org.mozilla.focus.helpers.TestHelper.getTargetContext
 import org.mozilla.focus.testAnnotations.SmokeTest
 
 // This test visits each About page and checks whether some essential elements are being displayed
@@ -28,7 +27,6 @@ class MozillaSupportPagesTest {
     @Before
     fun setUp() {
         featureSettingsHelper.setCfrForTrackingProtectionEnabled(false)
-        featureSettingsHelper.setNumberOfTabsOpened(4)
     }
 
     @After
@@ -67,7 +65,7 @@ class MozillaSupportPagesTest {
         }.openMozillaSettingsMenu {
         }.openAboutPage {
             verifyVersionNumbers()
-        }.openAboutPageLearnMoreLink() {
+        }.openAboutPageLearnMoreLink {
             verifyPageURL("www.mozilla.org/en-US/about/manifesto/")
         }
     }
@@ -88,10 +86,10 @@ class MozillaSupportPagesTest {
     @SmokeTest
     @Test
     fun openYourRightsPageTest() {
-        val yourRightsString = appContext.getString(
+        val yourRightsString = getTargetContext.getString(
             R.string.your_rights_content1,
-            appContext.getString(R.string.app_name),
-            "Mozilla Public License"
+            getTargetContext.getString(R.string.app_name),
+            "Mozilla Public License",
         )
 
         homeScreen {
@@ -112,21 +110,6 @@ class MozillaSupportPagesTest {
         }.openMozillaSettingsMenu {
         }.openPrivacyNotice {
             verifyPageURL("privacy/firefox-focus")
-        }
-    }
-
-    @SmokeTest
-    @Test
-    fun turnOffHomeScreenTipsTest() {
-        homeScreen {
-        }.openMainMenu {
-        }.openSettings {
-        }.openMozillaSettingsMenu {
-            switchHomeScreenTips()
-            exitToTop()
-        }
-        homeScreen {
-            verifyTipsCarouselIsDisplayed(false)
         }
     }
 }

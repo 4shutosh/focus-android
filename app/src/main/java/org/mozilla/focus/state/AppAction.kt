@@ -6,6 +6,7 @@ package org.mozilla.focus.state
 
 import mozilla.components.feature.top.sites.TopSite
 import mozilla.components.lib.state.Action
+import org.mozilla.focus.settings.permissions.permissionoptions.SitePermission
 
 /**
  * An [Action] to be dispatched on the [AppStore].
@@ -15,14 +16,14 @@ sealed class AppAction : Action {
      * The selected tab has changed.
      */
     data class SelectionChanged(
-        val tabId: String
+        val tabId: String,
     ) : AppAction()
 
     /**
      * Action for editing the URL of the tab with the given [tabId].
      */
     data class EditAction(
-        val tabId: String
+        val tabId: String,
     ) : AppAction()
 
     /**
@@ -34,7 +35,7 @@ sealed class AppAction : Action {
      * The user finished editing the URL of the tab with the given [tabId].
      */
     data class FinishEdit(
-        val tabId: String
+        val tabId: String,
     ) : AppAction()
 
     /**
@@ -59,12 +60,21 @@ sealed class AppAction : Action {
 
     data class OpenSettings(val page: Screen.Settings.Page) : AppAction()
 
+    data class OpenSitePermissionOptionsScreen(val sitePermission: SitePermission) : AppAction()
+
     data class NavigateUp(val tabId: String?) : AppAction()
 
     /**
      * Forces showing the first run screen.
      */
     internal object ShowFirstRun : AppAction()
+
+    internal object ShowOnboardingSecondScreen : AppAction()
+
+    /**
+     * Forces showing the home screen.
+     */
+    internal object ShowHomeScreen : AppAction()
 
     /**
      * Opens the tab with the given [tabId] and actively switches to the browser screen if needed.
@@ -79,7 +89,7 @@ sealed class AppAction : Action {
     /**
      * Site permissions autoplay rules has changed.
      */
-    data class AutoplayChange(val value: Boolean) : AppAction()
+    data class SitePermissionOptionChange(val value: Boolean) : AppAction()
 
     /**
      * State of secret settings has changed.
@@ -94,5 +104,10 @@ sealed class AppAction : Action {
     /**
      * State of show Tracking Protection CFR has changed
      */
-    data class ShowTrackingProtectionCfrChange(val value: Boolean) : AppAction()
+    data class ShowTrackingProtectionCfrChange(val value: Map<String, Boolean>) : AppAction()
+
+    /**
+     * State of Snackbar for promote search widget has changed
+     */
+    data class ShowSearchWidgetSnackBar(val value: Boolean) : AppAction()
 }

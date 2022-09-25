@@ -28,6 +28,7 @@ import mozilla.components.support.webextensions.WebExtensionSupport
 import org.mozilla.focus.biometrics.LockObserver
 import org.mozilla.focus.ext.settings
 import org.mozilla.focus.navigation.StoreLink
+import org.mozilla.focus.nimbus.FocusNimbus
 import org.mozilla.focus.session.VisibilityLifeCycleCallback
 import org.mozilla.focus.telemetry.FactsProcessor
 import org.mozilla.focus.telemetry.ProfilerMarkerFactProcessor
@@ -79,13 +80,12 @@ open class FocusApplication : LocaleAwareApplication(), CoroutineScope {
 
             storeLink.start()
 
-            GlobalScope.launch(Dispatchers.IO) {
-                components.migrator.start(this@FocusApplication)
-            }
-
             initializeWebExtensionSupport()
 
             setupLeakCanary()
+
+            components.appStartReasonProvider.registerInAppOnCreate(this)
+            components.startupActivityLog.registerInAppOnCreate(this)
 
             ProcessLifecycleOwner.get().lifecycle.addObserver(lockObserver)
         }
@@ -111,6 +111,9 @@ open class FocusApplication : LocaleAwareApplication(), CoroutineScope {
             // experiment on features close to startup.
             // But we need viaduct (the RustHttp client) to be ready before we do.
             components.experiments.initialize()
+            // This is the recommended way(Nimbus.api will be deprecated) to establish
+            // the connection between the Nimbus SDK (and thus the Nimbus server) and the generated code
+            FocusNimbus.initialize { components.experiments }
         }
     }
 
@@ -119,13 +122,13 @@ open class FocusApplication : LocaleAwareApplication(), CoroutineScope {
         when {
             settings.lightThemeSelected -> {
                 AppCompatDelegate.setDefaultNightMode(
-                    AppCompatDelegate.MODE_NIGHT_NO
+                    AppCompatDelegate.MODE_NIGHT_NO,
                 )
             }
 
             settings.darkThemeSelected -> {
                 AppCompatDelegate.setDefaultNightMode(
-                    AppCompatDelegate.MODE_NIGHT_YES
+                    AppCompatDelegate.MODE_NIGHT_YES,
                 )
             }
 
@@ -144,11 +147,11 @@ open class FocusApplication : LocaleAwareApplication(), CoroutineScope {
     private fun setDefaultTheme() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             AppCompatDelegate.setDefaultNightMode(
-                AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
             )
         } else {
             AppCompatDelegate.setDefaultNightMode(
-                AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY
+                AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY,
             )
         }
     }
@@ -184,9 +187,9 @@ open class FocusApplication : LocaleAwareApplication(), CoroutineScope {
                     url = url,
                     selectTab = true,
                     engineSession = engineSession,
-                    private = true
+                    private = true,
                 )
-            }
+            },
         )
     }
 }

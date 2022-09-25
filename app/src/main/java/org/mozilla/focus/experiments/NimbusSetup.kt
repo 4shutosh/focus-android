@@ -13,15 +13,28 @@ import mozilla.components.service.nimbus.NimbusDisabled
 import mozilla.components.service.nimbus.NimbusServerSettings
 import mozilla.components.support.base.log.logger.Logger
 import org.mozilla.experiments.nimbus.NimbusInterface
+import org.mozilla.experiments.nimbus.internal.EnrolledExperiment
+import org.mozilla.experiments.nimbus.internal.NimbusException
 import org.mozilla.focus.BuildConfig
+import org.mozilla.focus.GleanMetrics.NimbusExperiments
 import org.mozilla.focus.R
 import org.mozilla.focus.ext.components
 import org.mozilla.focus.ext.settings
+import org.mozilla.focus.nimbus.FocusNimbus
 
 @Suppress("TooGenericExceptionCaught")
-fun createNimbus(context: Context, url: String?): NimbusApi =
-    try {
-        val crashReporter = context.components.crashReporter
+fun createNimbus(context: Context, url: String?): NimbusApi {
+    val errorReporter: ((String, Throwable) -> Unit) = reporter@{ message, e ->
+        Logger.error("Nimbus error: $message", e)
+
+        if (e is NimbusException && !e.isReportableError()) {
+            return@reporter
+        }
+
+        context.components.crashReporter.submitCaughtException(e)
+    }
+
+    return try {
         // Eventually we'll want to use `NimbusDisabled` when we have no NIMBUS_ENDPOINT.
         // but we keep this here to not mix feature flags and how we configure Nimbus.
         val serverSettings = if (!url.isNullOrBlank()) {
@@ -52,17 +65,14 @@ fun createNimbus(context: Context, url: String?): NimbusApi =
             // Note: Using BuildConfig.BUILD_TYPE is important here so that it matches the value
             // passed into Glean. `Config.channel.toString()` turned out to be non-deterministic
             // and would mostly produce the value `Beta` and rarely would produce `beta`.
-            channel = BuildConfig.BUILD_TYPE
+            channel = BuildConfig.BUILD_TYPE,
         )
-        Nimbus(
-            context,
-            appInfo,
-            serverSettings,
-            { message, throwable ->
-                crashReporter.submitCaughtException(throwable)
-                Logger.error("Nimbus error: $message", throwable)
+        Nimbus(context, appInfo, serverSettings, errorReporter).apply {
+            val isTheFirstLaunch = context.settings.getAppLaunchCount() == 0
+            if (isTheFirstLaunch) {
+                register(EventsObserver)
             }
-        ).apply {
+
             // This performs the minimal amount of work required to load branch and enrolment data
             // into memory. If `getExperimentBranch` is called from another thread between here
             // and the next nimbus disk write (setting `globalUserParticipation` or
@@ -80,38 +90,63 @@ fun createNimbus(context: Context, url: String?): NimbusApi =
                 setExperimentsLocally(R.raw.initial_experiments)
             }
 
-            // Now fetch the experiments from the server. These will be available for feature
-            // configuration on the next run of the app. This call launches on the fetch thread.
+            if (isTheFirstLaunch) {
+                NimbusExperiments.nimbusInitialFetch.start()
+            }
             fetchExperiments()
 
-            register(object : NimbusInterface.Observer {
-                override fun onExperimentsFetched() {
-                    // We may have downloaded experiments on a previous run, so let's start using them
-                    // now. We didn't do this earlier, so as to make getExperimentBranch and friends returns
-                    // the same thing throughout the session. This call does its work on the db thread.
-                    applyPendingExperiments()
-
-                    // Remove lingering observer when we're done fetching experiments on startup.
-                    unregister(this)
-                }
-            })
+            register(
+                object : NimbusInterface.Observer {
+                    override fun onExperimentsFetched() {
+                        applyPendingExperiments()
+                        if (isTheFirstLaunch) {
+                            NimbusExperiments.nimbusInitialFetch.stop()
+                        }
+                        // Remove lingering observer when we're done fetching experiments on startup.
+                        unregister(this)
+                    }
+                },
+            )
         }
     } catch (e: Throwable) {
         // Something went wrong. We'd like not to, but stability of the app is more important than
         // failing fast here.
-        val crashReporter = context.components.crashReporter
-        if (crashReporter.enabled) {
-            crashReporter.submitCaughtException(e)
-        } else {
-            Logger.error("Failed to initialize Nimbus", e)
-        }
+        errorReporter("Failed to initialize Nimbus", e)
         NimbusDisabled(context = context)
     }
+}
 
 fun getNimbusAppName(): String {
     return if (BuildConfig.FLAVOR.contains("focus")) {
         "focus_android"
     } else {
         "klar_android"
+    }
+}
+
+/**
+ * Classifies which errors we should forward to our crash reporter or not. We want to filter out the
+ * non-reportable ones if we know there is no reasonable action that we can perform.
+ *
+ * This fix should be upstreamed as part of: https://github.com/mozilla/application-services/issues/4333
+ */
+fun NimbusException.isReportableError(): Boolean {
+    return when (this) {
+        is NimbusException.RequestException,
+        is NimbusException.ResponseException,
+        -> false
+        else -> true
+    }
+}
+
+/**
+ * Focus specific observer of Nimbus events.
+ *
+ * The generated code `FocusNimbus` provides a cache which should be invalidated
+ * when the experiments recipes are updated.
+ */
+private object EventsObserver : NimbusInterface.Observer {
+    override fun onUpdatesApplied(updated: List<EnrolledExperiment>) {
+        FocusNimbus.invalidateCachedValues()
     }
 }

@@ -7,6 +7,7 @@ package org.mozilla.focus
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import mozilla.components.browser.icons.BrowserIcons
@@ -66,12 +67,12 @@ import org.mozilla.focus.search.SearchMigration
 import org.mozilla.focus.state.AppState
 import org.mozilla.focus.state.AppStore
 import org.mozilla.focus.state.Screen
-import org.mozilla.focus.tabs.MergeTabsMiddleware
 import org.mozilla.focus.telemetry.GleanMetricsService
 import org.mozilla.focus.telemetry.TelemetryMiddleware
+import org.mozilla.focus.telemetry.startuptelemetry.AppStartReasonProvider
+import org.mozilla.focus.telemetry.startuptelemetry.StartupActivityLog
+import org.mozilla.focus.telemetry.startuptelemetry.StartupStateProvider
 import org.mozilla.focus.topsites.DefaultTopSitesStorage
-import org.mozilla.focus.utils.Features
-import org.mozilla.focus.utils.IntentUtils
 import org.mozilla.focus.utils.Settings
 import java.util.Locale
 
@@ -81,16 +82,22 @@ import java.util.Locale
 class Components(
     context: Context,
     private val engineOverride: Engine? = null,
-    private val clientOverride: Client? = null
+    private val clientOverride: Client? = null,
 ) {
     val appStore: AppStore by lazy {
         AppStore(
             AppState(
                 screen = Screen.Home,
-                topSites = emptyList()
-            )
+                topSites = emptyList(),
+            ),
         )
     }
+
+    val appStartReasonProvider by lazy { AppStartReasonProvider() }
+
+    val startupActivityLog by lazy { StartupActivityLog() }
+
+    val startupStateProvider by lazy { StartupStateProvider(startupActivityLog, appStartReasonProvider) }
 
     val settings by lazy { Settings(context) }
 
@@ -101,7 +108,8 @@ class Components(
             javascriptEnabled = !settings.shouldBlockJavaScript(),
             remoteDebuggingEnabled = settings.shouldEnableRemoteDebugging(),
             webFontsEnabled = !settings.shouldBlockWebFonts(),
-            httpsOnlyMode = settings.getHttpsOnlyMode()
+            httpsOnlyMode = settings.getHttpsOnlyMode(),
+            preferredColorScheme = settings.getPreferredColorScheme(),
         )
     }
 
@@ -131,11 +139,6 @@ class Components(
     }
 
     val store by lazy {
-        val cfrMiddleware = if (Features.IS_ERASE_CFR_ENABLED || Features.IS_TRACKING_PROTECTION_CFR_ENABLED) {
-            listOf(CfrMiddleware(context.components))
-        } else {
-            listOf()
-        }
         BrowserStore(
             middleware = listOf(
                 PrivateNotificationMiddleware(context),
@@ -151,15 +154,12 @@ class Components(
                 PromptMiddleware(),
                 AdsTelemetryMiddleware(adsTelemetry),
                 BlockedTrackersMiddleware(context),
-                MergeTabsMiddleware(context),
                 RecordingDevicesMiddleware(context),
-            ) + EngineMiddleware.create(engine) + cfrMiddleware
+            ) + EngineMiddleware.create(engine) + CfrMiddleware(context),
         ).apply {
             MediaSessionFeature(context, MediaSessionService::class.java, this).start()
         }
     }
-
-    val migrator by lazy { EngineProvider.provideTrackingProtectionMigrator(context) }
 
     /**
      * The [CustomTabsServiceStore] holds global custom tabs related data.
@@ -186,7 +186,9 @@ class Components(
 
     val metrics: GleanMetricsService by lazy { GleanMetricsService(context) }
 
-    val experiments: NimbusApi by lazy { createNimbus(context, BuildConfig.NIMBUS_ENDPOINT) }
+    val experiments: NimbusApi by lazy {
+        createNimbus(context, BuildConfig.NIMBUS_ENDPOINT)
+    }
 
     val adsTelemetry: AdsTelemetry by lazy { AdsTelemetry() }
 
@@ -204,7 +206,7 @@ class Components(
             interceptLinkClicks = true,
             launchInApp = {
                 context.settings.openLinksInExternalApp
-            }
+            },
         )
     }
 }
@@ -219,10 +221,10 @@ private fun createCrashReporter(context: Context): CrashReporter {
             tags = mapOf(
                 "build_flavor" to BuildConfig.FLAVOR,
                 "build_type" to BuildConfig.BUILD_TYPE,
-                "locale_lang_tag" to getLocaleTag(context)
+                "locale_lang_tag" to getLocaleTag(context),
             ),
             environment = BuildConfig.BUILD_TYPE,
-            sendEventForNativeCrashes = false // Do not send native crashes to Sentry
+            sendEventForNativeCrashes = false, // Do not send native crashes to Sentry
         )
 
         services.add(sentryService)
@@ -234,7 +236,7 @@ private fun createCrashReporter(context: Context): CrashReporter {
         version = org.mozilla.geckoview.BuildConfig.MOZ_APP_VERSION,
         buildId = org.mozilla.geckoview.BuildConfig.MOZ_APP_BUILDID,
         vendor = org.mozilla.geckoview.BuildConfig.MOZ_APP_VENDOR,
-        releaseChannel = org.mozilla.geckoview.BuildConfig.MOZ_UPDATE_CHANNEL
+        releaseChannel = org.mozilla.geckoview.BuildConfig.MOZ_UPDATE_CHANNEL,
     )
     services.add(socorroService)
 
@@ -242,11 +244,17 @@ private fun createCrashReporter(context: Context): CrashReporter {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
 
+    val crashReportingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        PendingIntent.FLAG_MUTABLE
+    } else {
+        0 // No flags. Default behavior.
+    }
+
     val pendingIntent = PendingIntent.getActivity(
         context,
         0,
         intent,
-        IntentUtils.defaultIntentPendingFlags
+        crashReportingIntentFlags,
     )
 
     return CrashReporter(
@@ -254,11 +262,11 @@ private fun createCrashReporter(context: Context): CrashReporter {
         services = services,
         telemetryServices = listOf(GleanCrashReporterService(context)),
         promptConfiguration = CrashReporter.PromptConfiguration(
-            appName = context.resources.getString(R.string.app_name)
+            appName = context.resources.getString(R.string.app_name),
         ),
         shouldPrompt = CrashReporter.Prompt.ALWAYS,
         enabled = true,
-        nonFatalCrashIntent = pendingIntent
+        nonFatalCrashIntent = pendingIntent,
     )
 }
 

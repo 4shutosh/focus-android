@@ -4,10 +4,13 @@
 
 package org.mozilla.focus.ext
 
+import android.app.Activity
 import android.content.Context
+import android.view.ContextThemeWrapper
 import android.view.accessibility.AccessibilityManager
 import org.mozilla.focus.Components
 import org.mozilla.focus.FocusApplication
+import org.mozilla.focus.R
 import org.mozilla.focus.utils.Settings
 import java.text.DateFormat
 
@@ -40,6 +43,17 @@ val Context.accessibilityManager: AccessibilityManager
  */
 val Context.installedDate: String
     get() {
-        val installTime = this.packageManager.getPackageInfo(this.packageName, 0).firstInstallTime
+        val installTime = this.packageManager.getPackageInfoCompat(this.packageName, 0).firstInstallTime
         return DateFormat.getDateInstance().format(installTime)
     }
+
+/**
+ * Checks if the current device is a tablet.
+ */
+fun Context.isTablet(): Boolean = resources.getBoolean(R.bool.is_tablet)
+
+/**
+ * Casts [Context] to [Activity].
+ */
+fun Context.tryAsActivity() =
+    (this as? ContextThemeWrapper)?.baseContext as? Activity ?: this as? Activity

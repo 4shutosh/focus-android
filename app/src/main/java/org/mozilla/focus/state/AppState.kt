@@ -6,6 +6,7 @@ package org.mozilla.focus.state
 
 import mozilla.components.feature.top.sites.TopSite
 import mozilla.components.lib.state.State
+import org.mozilla.focus.settings.permissions.permissionoptions.SitePermission
 import java.util.UUID
 
 /**
@@ -13,18 +14,20 @@ import java.util.UUID
  *
  * @property screen The currently displayed screen.
  * @property topSites The list of [TopSite] to display on the Home screen.
- * @property autoplayRulesChanged A flag which reflects the state of autoplay rules,
+ * @property sitePermissionOptionChange A flag which reflects the state of site permission rules,
  * whether they have been updated or not
  * @property secretSettingsEnabled A flag which reflects the state of debug secret settings
  * @property showEraseTabsCfr A flag which reflects the state erase tabs CFR
+ * @property showSearchWidgetSnackbar A flag which reflects the state of search widget snackbar
  */
 data class AppState(
     val screen: Screen,
     val topSites: List<TopSite> = emptyList(),
-    val autoplayRulesChanged: Boolean = false,
+    val sitePermissionOptionChange: Boolean = false,
     val secretSettingsEnabled: Boolean = false,
     val showEraseTabsCfr: Boolean = false,
-    val showTrackingProtectionCfr: Boolean = false
+    val showSearchWidgetSnackbar: Boolean = false,
+    val showTrackingProtectionCfrForTab: Map<String, Boolean> = emptyMap(),
 ) : State
 
 /**
@@ -43,6 +46,11 @@ sealed class Screen {
     object FirstRun : Screen()
 
     /**
+     * Second screen from new onboarding flow.
+     */
+    object OnboardingSecondScreen : Screen()
+
+    /**
      * The home screen.
      */
     object Home : Screen()
@@ -55,7 +63,7 @@ sealed class Screen {
      */
     data class Browser(
         val tabId: String,
-        val showTabs: Boolean
+        val showTabs: Boolean,
     ) : Screen() {
         // Whenever the showTabs property changes we want to treat this as a new screen and force
         // a navigation.
@@ -66,16 +74,16 @@ sealed class Screen {
      * Editing the URL of a tab.
      */
     data class EditUrl(
-        val tabId: String
+        val tabId: String,
     ) : Screen()
 
     /**
      * The application is locked (and requires unlocking).
      */
     object Locked : Screen()
-
+    data class SitePermissionOptionsScreen(val sitePermission: SitePermission) : Screen()
     data class Settings(
-        val page: Page = Page.Start
+        val page: Page = Page.Start,
     ) : Screen() {
         enum class Page {
             Start,
@@ -91,7 +99,6 @@ sealed class Screen {
             PrivacyExceptions,
             PrivacyExceptionsRemove,
             SitePermissions,
-            Autoplay,
             Studies,
             SecretSettings,
 

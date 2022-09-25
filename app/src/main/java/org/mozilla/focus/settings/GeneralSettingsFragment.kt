@@ -15,6 +15,7 @@ import androidx.preference.SwitchPreference
 import org.mozilla.focus.R
 import org.mozilla.focus.ext.requireComponents
 import org.mozilla.focus.ext.requirePreference
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.ext.settings
 import org.mozilla.focus.locale.screen.LanguageStorage.Companion.LOCALE_SYSTEM_DEFAULT
 import org.mozilla.focus.locale.screen.LocaleDescriptor
@@ -40,7 +41,7 @@ class GeneralSettingsFragment :
     override fun onResume() {
         super.onResume()
         defaultBrowserPreference.update()
-        updateTitle(R.string.preference_category_general)
+        showToolbar(getString(R.string.preference_category_general))
     }
 
     private fun setupPreferences() {
@@ -58,7 +59,7 @@ class GeneralSettingsFragment :
         localePreference.summary = getLocaleSummary()
         localePreference.setOnPreferenceClickListener {
             requireComponents.appStore.dispatch(
-                AppAction.OpenSettings(Screen.Settings.Page.Locale)
+                AppAction.OpenSettings(Screen.Settings.Page.Locale),
             )
             true
         }
@@ -114,7 +115,7 @@ class GeneralSettingsFragment :
         val value: String? =
             sharedConfig.getString(
                 resources.getString(R.string.pref_key_locale),
-                resources.getString(R.string.preference_language_systemdefault)
+                resources.getString(R.string.preference_language_systemdefault),
             )
         return value?.let {
             if (value.isEmpty() || value == LOCALE_SYSTEM_DEFAULT) {
@@ -128,7 +129,7 @@ class GeneralSettingsFragment :
         addToRadioGroup(
             radioLightTheme,
             radioDarkTheme,
-            radioDefaultTheme
+            radioDefaultTheme,
         )
     }
 
@@ -136,16 +137,19 @@ class GeneralSettingsFragment :
         if (AppCompatDelegate.getDefaultNightMode() == mode) return
         AppCompatDelegate.setDefaultNightMode(mode)
         activity?.recreate()
+
+        requireComponents.engine.settings.preferredColorScheme = requireComponents.settings.getPreferredColorScheme()
+        requireComponents.sessionUseCases.reload.invoke()
     }
 
     private fun setDefaultTheme() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             AppCompatDelegate.setDefaultNightMode(
-                AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
             )
         } else {
             AppCompatDelegate.setDefaultNightMode(
-                AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY
+                AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY,
             )
         }
     }

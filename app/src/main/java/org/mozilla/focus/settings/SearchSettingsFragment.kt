@@ -12,6 +12,7 @@ import org.mozilla.focus.GleanMetrics.SearchEngines
 import org.mozilla.focus.GleanMetrics.ShowSearchSuggestions
 import org.mozilla.focus.R
 import org.mozilla.focus.ext.requireComponents
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.state.Screen
 import org.mozilla.focus.telemetry.TelemetryWrapper
@@ -28,7 +29,7 @@ class SearchSettingsFragment :
 
         preferenceManager.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
 
-        updateTitle(R.string.preference_category_search)
+        showToolbar(getString(R.string.preference_category_search))
     }
 
     override fun onPause() {
@@ -40,7 +41,7 @@ class SearchSettingsFragment :
         when (preference.key) {
             resources.getString(R.string.pref_key_search_engine) -> run {
                 requireComponents.appStore.dispatch(
-                    AppAction.OpenSettings(page = Screen.Settings.Page.SearchList)
+                    AppAction.OpenSettings(page = Screen.Settings.Page.SearchList),
                 )
                 SearchEngines.openSettings.record(NoExtras())
 
@@ -48,7 +49,7 @@ class SearchSettingsFragment :
             }
             resources.getString(R.string.pref_key_screen_autocomplete) ->
                 requireComponents.appStore.dispatch(
-                    AppAction.OpenSettings(page = Screen.Settings.Page.SearchAutocomplete)
+                    AppAction.OpenSettings(page = Screen.Settings.Page.SearchAutocomplete),
                 )
         }
         return super.onPreferenceTreeClick(preference)
@@ -58,7 +59,7 @@ class SearchSettingsFragment :
         when (key) {
             resources.getString(R.string.pref_key_show_search_suggestions) ->
                 ShowSearchSuggestions.changedFromSettings.record(
-                    ShowSearchSuggestions.ChangedFromSettingsExtra(sharedPreferences.getBoolean(key, false))
+                    ShowSearchSuggestions.ChangedFromSettingsExtra(sharedPreferences.getBoolean(key, false)),
                 )
         }
     }

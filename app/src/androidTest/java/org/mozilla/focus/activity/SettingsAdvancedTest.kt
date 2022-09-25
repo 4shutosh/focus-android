@@ -7,14 +7,15 @@ import androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.focus.activity.robots.homeScreen
 import org.mozilla.focus.helpers.FeatureSettingsHelper
 import org.mozilla.focus.helpers.MainActivityFirstrunTestRule
-import org.mozilla.focus.helpers.RetryTestRule
-import org.mozilla.focus.helpers.TestHelper.createMockResponseFromAsset
+import org.mozilla.focus.helpers.MockWebServerHelper
+import org.mozilla.focus.helpers.TestAssetHelper.getGenericTabAsset
 import org.mozilla.focus.helpers.TestHelper.waitingTimeShort
 import org.mozilla.focus.testAnnotations.SmokeTest
 
@@ -28,17 +29,14 @@ class SettingsAdvancedTest {
     @get: Rule
     var mActivityTestRule = MainActivityFirstrunTestRule(showFirstRun = false)
 
-    @Rule
-    @JvmField
-    val retryTestRule = RetryTestRule(3)
-
     @Before
     fun setup() {
-        webServer = MockWebServer()
-        webServer.enqueue(createMockResponseFromAsset("tab3.html"))
-        webServer.enqueue(createMockResponseFromAsset("tab3.html"))
+        webServer = MockWebServer().apply {
+            dispatcher = MockWebServerHelper.AndroidAssetDispatcher()
+            start()
+        }
         featureSettingsHelper.setCfrForTrackingProtectionEnabled(false)
-        featureSettingsHelper.setNumberOfTabsOpened(4)
+        featureSettingsHelper.setSearchWidgetDialogEnabled(false)
     }
 
     @After
@@ -47,10 +45,11 @@ class SettingsAdvancedTest {
         featureSettingsHelper.resetAllFeatureFlags()
     }
 
+    @Ignore("Failing: https://github.com/mozilla-mobile/focus-android/issues/7659")
     @SmokeTest
     @Test
     fun openLinksInAppsTest() {
-        val tab3Url = webServer.url("tab3.html").toString()
+        val tab3Url = getGenericTabAsset(webServer, 3).url
         val youtubeLink = "https://www.youtube.com/c/MozillaChannel/videos"
 
         homeScreen {

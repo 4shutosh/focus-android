@@ -7,8 +7,6 @@ package org.mozilla.focus.helpers
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import org.mozilla.focus.ext.settings
-import org.mozilla.focus.utils.AppConstants
-import org.mozilla.focus.utils.Features
 
 class FeatureSettingsHelper {
     val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -17,19 +15,16 @@ class FeatureSettingsHelper {
     // saving default values of feature flags
     private var shouldShowCfrForTrackingProtection: Boolean = settings.shouldShowCfrForTrackingProtection
 
-    // saving default value of number of tabs opened, which is used for erase tabs cfr
-    private var numberOfTabsOpened: Int = settings.numberOfTabsOpened
-
     fun setCfrForTrackingProtectionEnabled(enabled: Boolean) {
         settings.shouldShowCfrForTrackingProtection = enabled
     }
 
-    fun setNumberOfTabsOpened(tabsOpened: Int) {
-        settings.numberOfTabsOpened = tabsOpened
-    }
-
-    fun showNewOnboardingScreen(shouldShow: Boolean) {
-        Features.ONBOARDING = shouldShow
+    fun setSearchWidgetDialogEnabled(enabled: Boolean) {
+        if (enabled) {
+            settings.addClearBrowsingSessions(4)
+        } else {
+            settings.addClearBrowsingSessions(10)
+        }
     }
 
     // Important:
@@ -37,7 +32,5 @@ class FeatureSettingsHelper {
     // to make sure the app goes back to the default state
     fun resetAllFeatureFlags() {
         settings.shouldShowCfrForTrackingProtection = shouldShowCfrForTrackingProtection
-        settings.numberOfTabsOpened = numberOfTabsOpened
-        Features.ONBOARDING = AppConstants.isDevOrNightlyBuild
     }
 }

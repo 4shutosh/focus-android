@@ -23,6 +23,8 @@ only-for-build-types:
     - beta
 
 job-template:
+    attributes:
+        shipping_phase: promote     # APKs are sent to testing tracks
     description: Publish Focus
     worker-type: push-apk
     run-on-tasks-for: []
@@ -47,3 +49,8 @@ job-template:
                 focus-release: gpf
                 klar-release: gpkl
         kind: build
+    routes:
+        by-level:
+            '3':
+              - "notify.email.release-mgmt@mozilla.com.on-failed"
+            'default': []

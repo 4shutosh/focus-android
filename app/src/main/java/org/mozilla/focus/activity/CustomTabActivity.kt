@@ -16,6 +16,8 @@ import org.mozilla.focus.R
 import org.mozilla.focus.ext.components
 import org.mozilla.focus.ext.updateSecureWindowFlags
 import org.mozilla.focus.fragment.BrowserFragment
+import org.mozilla.focus.telemetry.startuptelemetry.StartupPathProvider
+import org.mozilla.focus.telemetry.startuptelemetry.StartupTypeTelemetry
 
 /**
  * The main entry point for "custom tabs" opened by third-party apps.
@@ -24,7 +26,11 @@ class CustomTabActivity : LocaleAwareAppCompatActivity() {
     private lateinit var customTabId: String
     private lateinit var browserFragment: BrowserFragment
 
+    private val startupPathProvider = StartupPathProvider()
+    private lateinit var startupTypeTelemetry: StartupTypeTelemetry
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        updateSecureWindowFlags()
         super.onCreate(savedInstanceState)
 
         val intent = SafeIntent(intent)
@@ -51,6 +57,11 @@ class CustomTabActivity : LocaleAwareAppCompatActivity() {
                 .add(R.id.container, browserFragment)
                 .commit()
         }
+
+        startupPathProvider.attachOnActivityOnCreate(lifecycle, intent.unsafe)
+        startupTypeTelemetry = StartupTypeTelemetry(components.startupStateProvider, startupPathProvider).apply {
+            attachOnMainActivityOnCreate(lifecycle)
+        }
     }
 
     override fun onPause() {
@@ -61,25 +72,21 @@ class CustomTabActivity : LocaleAwareAppCompatActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-
-        updateSecureWindowFlags()
-    }
-
     override fun onBackPressed() {
         if (browserFragment.sessionFeature.onBackPressed()) {
             return
         } else {
-            super.onBackPressed()
+            super.getOnBackPressedDispatcher().onBackPressed()
         }
     }
 
-    override fun onCreateView(name: String, context: Context, attrs: AttributeSet): View? {
+    override fun onCreateView(parent: View?, name: String, context: Context, attrs: AttributeSet): View? {
         return if (name == EngineView::class.java.name) {
             val engineView = components.engine.createView(context, attrs)
             engineView.asView()
-        } else super.onCreateView(name, context, attrs)
+        } else {
+            super.onCreateView(parent, name, context, attrs)
+        }
     }
 
     companion object {

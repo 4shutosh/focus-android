@@ -5,48 +5,36 @@
 package org.mozilla.focus.settings
 
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
-import androidx.annotation.StringRes
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceFragmentCompat
 import org.mozilla.focus.R
-import org.mozilla.focus.ext.setNavigationIcon
-import org.mozilla.focus.utils.StatusBarUtils
+import org.mozilla.focus.activity.MainActivity
 
 /**
  * Similar behavior as [BaseSettingsFragment], but doesn't extend [PreferenceFragmentCompat] and is
  * a regular [Fragment] instead.
  */
-open class BaseSettingsLikeFragment : Fragment() {
-    fun updateTitle(title: String) {
-        (requireActivity() as AppCompatActivity).supportActionBar?.title = title
-    }
-
-    fun updateTitle(@StringRes titleResource: Int) {
-        updateTitle(getString(titleResource))
-    }
-
+open class BaseSettingsLikeFragment : Fragment(), MenuProvider {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val statusBarView = view.findViewById<View>(R.id.status_bar_background)
-        StatusBarUtils.getStatusBarHeight(statusBarView) { statusBarHeight ->
-            statusBarView.layoutParams.height = statusBarHeight
-            statusBarView.setBackgroundColor(
-                ContextCompat.getColor(
-                    view.context,
-                    R.color.settings_background
-                )
-            )
-        }
+        val menuHost: MenuHost = requireHost() as MenuHost
+        menuHost.addMenuProvider(this, viewLifecycleOwner, Lifecycle.State.RESUMED)
 
-        val toolbar = view.findViewById<Toolbar>(R.id.toolbar)
-
-        val activity = requireActivity() as AppCompatActivity
-        activity.setSupportActionBar(toolbar)
-        activity.setNavigationIcon(R.drawable.ic_back_button)
+        // Customize status bar background if the parent activity can be casted to MainActivity
+        (requireActivity() as? MainActivity)?.customizeStatusBar(R.color.settings_background)
     }
+
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+        // no-op
+    }
+
+    override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
 }

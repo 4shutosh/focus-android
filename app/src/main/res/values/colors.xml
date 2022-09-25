@@ -14,6 +14,7 @@
 
     <color name="disabled">#66312A65</color>
     <color name="background">@color/colorPrimary</color>
+    <color name="splash_screen_background">@color/photonViolet05</color>
 
     <color name="colorTextInactive">#80FFFFFF</color>
     <color name="urlBarHintText">@color/photonDarkGrey05</color>
@@ -79,11 +80,9 @@
     <!-- Onboarding -->
     <color name="onboarding_indicator_default">#7FFFFFFF</color>
     <color name="onboarding_indicator_selected">#FFFFFFFF</color>
-
-    <!-- Home Tips -->
-    <color name="tip_dot_background">@color/photonInk50</color>
-    <color name="tip_text_color">@color/secondaryText</color>
-    <color name="tip_deeplink_color">@color/accent</color>
+    <color name="onboardingButtonOneColor">#312A64</color>
+    <color name="onboardingButtonTwoColor">#E0E0E6</color>
+    <color name="onboardingCloseButtonColor">#F2F2F7</color>
 
     <!-- Session -->
     <color name="colorSession">@color/photonLightGrey05</color>
@@ -131,4 +130,20 @@
     <color name="cfr_pop_up_shape_end_color">#AB71FF</color>
     <color name="cfr_pop_up_shape_start_color">#592ACB</color>
     <color name="cfr_triangle_color">#FFFFFF</color>
+
+    <!-- Biometric screen colors -->
+    <color name="biometric_show_button_background">#312A64</color>
+
+    <!-- HomeScreen background colors -->
+    <color name="home_screen_modal_gradient_one">#D3D4FA</color>
+    <color name="home_screen_modal_gradient_two">#D7D6F9</color>
+    <color name="home_screen_modal_gradient_three">#ECEAFA</color>
+    <color name="home_screen_modal_gradient_four">#F0EFFA</color>
+    <color name="home_screen_modal_gradient_five">#D9D3F5</color>
+    <color name="home_screen_modal_gradient_six">#D6C9EB</color>
+
+    <!-- Promote SearchWidget Dialog colors -->
+    <color name="promote_search_widget_dialog_background">#FFFFFF</color>
+    <color name="promote_search_widget_dialog_close_button_background">#F2F2F7</color>
+    <color name="promote_search_widget_dialog_add_widget_button_background">#312A64</color>
 </resources>

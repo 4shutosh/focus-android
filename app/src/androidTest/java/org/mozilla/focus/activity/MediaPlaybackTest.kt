@@ -8,10 +8,14 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.mozilla.focus.activity.robots.browserScreen
+import org.mozilla.focus.activity.robots.notificationTray
 import org.mozilla.focus.activity.robots.searchScreen
 import org.mozilla.focus.helpers.FeatureSettingsHelper
 import org.mozilla.focus.helpers.MainActivityFirstrunTestRule
-import org.mozilla.focus.helpers.TestHelper.createMockResponseFromAsset
+import org.mozilla.focus.helpers.MockWebServerHelper
+import org.mozilla.focus.helpers.TestAssetHelper.getMediaTestAsset
+import org.mozilla.focus.helpers.TestHelper.mDevice
 import org.mozilla.focus.testAnnotations.SmokeTest
 
 class MediaPlaybackTest {
@@ -24,9 +28,10 @@ class MediaPlaybackTest {
     @Before
     fun setUp() {
         featureSettingsHelper.setCfrForTrackingProtectionEnabled(false)
-        featureSettingsHelper.setNumberOfTabsOpened(4)
-        webServer = MockWebServer()
-        webServer.start()
+        webServer = MockWebServer().apply {
+            dispatcher = MockWebServerHelper.AndroidAssetDispatcher()
+            start()
+        }
     }
 
     @After
@@ -38,9 +43,7 @@ class MediaPlaybackTest {
     @SmokeTest
     @Test
     fun testVideoPlayback() {
-        webServer.enqueue(createMockResponseFromAsset("videoPage.html"))
-        webServer.enqueue(createMockResponseFromAsset("resources/videoSample.webm"))
-        val videoPageUrl = webServer.url("videoPage.html").toString()
+        val videoPageUrl = getMediaTestAsset(webServer, "videoPage").url
 
         searchScreen {
         }.loadPage(videoPageUrl) {
@@ -48,19 +51,15 @@ class MediaPlaybackTest {
             waitForPlaybackToStart()
             // need this alert hack to check the video is playing,
             // currently the test cannot verify the text in the page
-            dismissMediaPlayingAlert()
             clickPauseButton()
             verifyPlaybackStopped()
-            dismissMediaPlayingAlert()
         }
     }
 
     @SmokeTest
     @Test
     fun testAudioPlayback() {
-        webServer.enqueue(createMockResponseFromAsset("audioPage.html"))
-        webServer.enqueue(createMockResponseFromAsset("resources/audioSample.mp3"))
-        val audioPageUrl = webServer.url("audioPage.html").toString()
+        val audioPageUrl = getMediaTestAsset(webServer, "audioPage").url
 
         searchScreen {
         }.loadPage(audioPageUrl) {
@@ -68,10 +67,35 @@ class MediaPlaybackTest {
             waitForPlaybackToStart()
             // need this alert hack to check the video is playing,
             // currently the test cannot verify the text in the page
-            dismissMediaPlayingAlert()
             clickPauseButton()
             verifyPlaybackStopped()
-            dismissMediaPlayingAlert()
+        }
+    }
+
+    @SmokeTest
+    @Test
+    fun testMediaContentNotification() {
+        val audioPageUrl = getMediaTestAsset(webServer, "audioPage").url
+        val notificationMessage = "A site is playing media"
+
+        searchScreen {
+        }.loadPage(audioPageUrl) {
+            clickPlayButton()
+            waitForPlaybackToStart()
+        }
+        mDevice.openNotification()
+        notificationTray {
+            verifyMediaNotificationExists("A site is playing media")
+            clickMediaNotificationControlButton("Pause")
+            verifyMediaNotificationButtonState("Play")
+        }
+        mDevice.pressBack()
+        browserScreen {
+            verifyPlaybackStopped()
+        }.clearBrowsingData {}
+        mDevice.openNotification()
+        notificationTray {
+            verifyNotificationGone(notificationMessage)
         }
     }
 }

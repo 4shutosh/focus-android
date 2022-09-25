@@ -17,7 +17,7 @@ import org.mozilla.focus.databinding.SwitchWithDescriptionBinding
 class SwitchWithDescription @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0
+    defStyleAttr: Int = 0,
 ) : ConstraintLayout(context, attrs, defStyleAttr) {
 
     internal var binding: SwitchWithDescriptionBinding
@@ -30,26 +30,25 @@ class SwitchWithDescription @JvmOverloads constructor(
         context.withStyledAttributes(attrs, R.styleable.SwitchWithDescription, defStyleAttr, 0) {
             val icon = getResourceId(
                 R.styleable.SwitchWithDescription_switchIcon,
-                R.drawable.mozac_ic_shield
+                R.drawable.mozac_ic_shield,
             )
-            updateIcon(icon)
 
-            updateTitle(
-                resources.getString(
-                    getResourceId(
-                        R.styleable.SwitchWithDescription_switchTitle,
-                        R.string.enhanced_tracking_protection
-                    )
-                )
+            val switchTitle = resources.getString(
+                getResourceId(
+                    R.styleable.SwitchWithDescription_switchTitle,
+                    R.string.enhanced_tracking_protection,
+                ),
             )
+            updateIcon(icon = icon, iconContentDescription = switchTitle)
+            updateTitle(switchTitle)
 
             updateDescription(
                 resources.getString(
                     getResourceId(
                         R.styleable.SwitchWithDescription_switchDescription,
-                        R.string.enhanced_tracking_protection_state_on
-                    )
-                )
+                        R.string.enhanced_tracking_protection_state_on,
+                    ),
+                ),
             )
         }
     }
@@ -62,9 +61,12 @@ class SwitchWithDescription @JvmOverloads constructor(
         binding.description.text = description
     }
 
-    internal fun updateIcon(icon: Int) {
-        binding.switchWidget.putCompoundDrawablesRelativeWithIntrinsicBounds(
-            start = AppCompatResources.getDrawable(context, icon)
-        )
+    internal fun updateIcon(icon: Int, iconContentDescription: String) {
+        with(binding.switchWidget) {
+            putCompoundDrawablesRelativeWithIntrinsicBounds(
+                start = AppCompatResources.getDrawable(context, icon),
+            )
+            contentDescription = iconContentDescription
+        }
     }
 }

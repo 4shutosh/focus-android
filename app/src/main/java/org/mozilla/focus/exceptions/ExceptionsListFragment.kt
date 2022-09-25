@@ -33,6 +33,7 @@ import org.mozilla.focus.autocomplete.AutocompleteDomainFormatter
 import org.mozilla.focus.databinding.FragmentExceptionsDomainsBinding
 import org.mozilla.focus.ext.components
 import org.mozilla.focus.ext.requireComponents
+import org.mozilla.focus.ext.showToolbar
 import org.mozilla.focus.settings.BaseSettingsLikeFragment
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.state.Screen
@@ -62,7 +63,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
             override fun onMove(
                 recyclerView: RecyclerView,
                 viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
+                target: RecyclerView.ViewHolder,
             ): Boolean {
                 val from = viewHolder.bindingAdapterPosition
                 val to = target.bindingAdapterPosition
@@ -84,7 +85,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
 
             override fun clearView(
                 recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder
+                viewHolder: RecyclerView.ViewHolder,
             ) {
                 super.clearView(recyclerView, viewHolder)
 
@@ -92,12 +93,8 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
                     viewHolder.onCleared()
                 }
             }
-        })
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
-    }
+        },
+    )
 
     /**
      * In selection mode the user can select and remove items. In non-selection mode the list can
@@ -108,7 +105,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentExceptionsDomainsBinding.inflate(inflater, container, false)
         return binding.root
@@ -139,15 +136,15 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
                 val exceptionsListSize =
                     (binding.exceptionList.adapter as DomainListAdapter).itemCount
                 TrackingProtectionExceptions.allowListCleared.record(
-                    TrackingProtectionExceptions.AllowListClearedExtra(exceptionsListSize)
+                    TrackingProtectionExceptions.AllowListClearedExtra(exceptionsListSize),
                 )
 
                 TelemetryWrapper.removeAllExceptionDomains(exceptionsListSize)
 
                 requireComponents.appStore.dispatch(
                     AppAction.NavigateUp(
-                        requireComponents.store.state.selectedTabId
-                    )
+                        requireComponents.store.state.selectedTabId,
+                    ),
                 )
             }
         }
@@ -158,12 +155,12 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
 
         job = Job()
 
-        updateTitle(R.string.preference_exceptions)
+        showToolbar(getString(R.string.preference_exceptions))
 
         (binding.exceptionList.adapter as DomainListAdapter).refresh(requireActivity()) {
             if ((binding.exceptionList.adapter as DomainListAdapter).itemCount == 0) {
                 requireComponents.appStore.dispatch(
-                    AppAction.NavigateUp(requireComponents.store.state.selectedTabId)
+                    AppAction.NavigateUp(requireComponents.store.state.selectedTabId),
                 )
             }
             activity?.invalidateOptionsMenu()
@@ -180,11 +177,11 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
         _binding = null
     }
 
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.menu_exceptions_list, menu)
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+        menuInflater.inflate(R.menu.menu_exceptions_list, menu)
     }
 
-    override fun onPrepareOptionsMenu(menu: Menu) {
+    override fun onPrepareMenu(menu: Menu) {
         val removeItem = menu.findItem(R.id.remove)
 
         removeItem?.let {
@@ -195,14 +192,14 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
         }
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+    override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
         R.id.remove -> {
             requireComponents.appStore.dispatch(
-                AppAction.OpenSettings(page = Screen.Settings.Page.PrivacyExceptionsRemove)
+                AppAction.OpenSettings(page = Screen.Settings.Page.PrivacyExceptionsRemove),
             )
             true
         }
-        else -> super.onOptionsItemSelected(item)
+        else -> false
     }
 
     /**
@@ -228,7 +225,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
             when (viewType) {
                 DomainViewHolder.LAYOUT_ID ->
                     DomainViewHolder(
-                        LayoutInflater.from(parent.context).inflate(viewType, parent, false)
+                        LayoutInflater.from(parent.context).inflate(viewType, parent, false),
                     ) { AutocompleteDomainFormatter.format(it) }
                 else -> throw IllegalArgumentException("Unknown view type: $viewType")
             }
@@ -242,7 +239,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
                     isSelectionMode(),
                     selectedExceptions,
                     itemTouchHelper,
-                    this@ExceptionsListFragment
+                    this@ExceptionsListFragment,
                 )
             }
         }
@@ -269,7 +266,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
      */
     private class DomainViewHolder(
         itemView: View,
-        val domainFormatter: DomainFormatter? = null
+        val domainFormatter: DomainFormatter? = null,
     ) : RecyclerView.ViewHolder(itemView) {
         val domainView: TextView = itemView.findViewById(R.id.domainView)
         val checkBoxView: CheckBox = itemView.findViewById(R.id.checkbox)
@@ -284,7 +281,7 @@ open class ExceptionsListFragment : BaseSettingsLikeFragment(), CoroutineScope {
             isSelectionMode: Boolean,
             selectedExceptions: MutableList<TrackingProtectionException>,
             itemTouchHelper: ItemTouchHelper,
-            fragment: ExceptionsListFragment
+            fragment: ExceptionsListFragment,
         ) {
             domainView.text = domainFormatter?.invoke(exception.url) ?: exception.url
 

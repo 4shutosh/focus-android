@@ -7,8 +7,6 @@ package org.mozilla.focus.browser.integration
 import android.app.Activity
 import android.os.Build
 import android.view.View
-import android.view.WindowManager
-import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.browser.toolbar.BrowserToolbar
@@ -17,6 +15,8 @@ import mozilla.components.feature.session.FullScreenFeature
 import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.support.base.feature.LifecycleAwareFeature
 import mozilla.components.support.base.feature.UserInteractionHandler
+import mozilla.components.support.ktx.android.view.enterToImmersiveMode
+import mozilla.components.support.ktx.android.view.exitImmersiveMode
 import org.mozilla.focus.ext.disableDynamicBehavior
 import org.mozilla.focus.ext.enableDynamicBehavior
 import org.mozilla.focus.ext.hide
@@ -39,7 +39,7 @@ class FullScreenIntegration(
         sessionUseCases,
         tabId,
         ::viewportFitChanged,
-        ::fullScreenChanged
+        ::fullScreenChanged,
     )
 
     override fun start() {
@@ -58,10 +58,15 @@ class FullScreenIntegration(
 
             switchToImmersiveMode()
         } else {
+            // If the video is in PiP, but is not in fullscreen anymore we should move the task containing
+            // this activity to the back of the activity stack
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) {
+                activity.moveTaskToBack(false)
+            }
             statusBar.visibility = View.VISIBLE
             exitBrowserFullscreen()
 
-            exitImmersiveModeIfNeeded()
+            exitImmersiveMode()
         }
     }
 
@@ -70,9 +75,10 @@ class FullScreenIntegration(
     }
 
     @VisibleForTesting
-    @RequiresApi(Build.VERSION_CODES.P)
     internal fun viewportFitChanged(viewportFit: Int) {
-        activity.window.attributes.layoutInDisplayCutoutMode = viewportFit
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            activity.window.attributes.layoutInDisplayCutoutMode = viewportFit
+        }
     }
 
     /**
@@ -82,32 +88,14 @@ class FullScreenIntegration(
      */
     @VisibleForTesting
     internal fun switchToImmersiveMode() {
-        val window = activity.window
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        @Suppress("DEPRECATION") // https://github.com/mozilla-mobile/focus-android/issues/5016
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
+        activity.enterToImmersiveMode()
     }
 
     /**
      * Show the system bars again.
      */
-    fun exitImmersiveModeIfNeeded() {
-        if (WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON and activity.window.attributes.flags == 0) {
-            // We left immersive mode already.
-            return
-        }
-
-        val window = activity.window
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        @Suppress("DEPRECATION") // https://github.com/mozilla-mobile/focus-android/issues/5016
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+    fun exitImmersiveMode() {
+        activity.exitImmersiveMode()
     }
 
     @VisibleForTesting

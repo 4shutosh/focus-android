@@ -11,8 +11,6 @@ import mozilla.components.feature.contextmenu.ContextMenuCandidate
 import mozilla.components.feature.contextmenu.ContextMenuUseCases
 import mozilla.components.feature.contextmenu.DefaultSnackbarDelegate
 import mozilla.components.feature.tabs.TabsUseCases
-import org.mozilla.focus.ext.components
-import org.mozilla.focus.ext.isMultiTabsEnabled
 
 object ContextMenuCandidates {
     @Suppress("LongParameterList")
@@ -22,53 +20,47 @@ object ContextMenuCandidates {
         contextMenuUseCases: ContextMenuUseCases,
         appLinksUseCases: AppLinksUseCases,
         snackBarParentView: View,
-        snackbarDelegate: ContextMenuCandidate.SnackbarDelegate = DefaultSnackbarDelegate()
-    ): List<ContextMenuCandidate> =
-        if (context.components.experiments.isMultiTabsEnabled) {
-            listOf(
-                ContextMenuCandidate.createOpenInPrivateTabCandidate(
-                    context,
-                    tabsUseCases,
-                    snackBarParentView,
-                    snackbarDelegate
-                )
-            )
-        } else {
-            emptyList()
-        } + listOf(
-            ContextMenuCandidate.createCopyLinkCandidate(context, snackBarParentView, snackbarDelegate),
+        snackbarDelegate: ContextMenuCandidate.SnackbarDelegate = DefaultSnackbarDelegate(),
+    ): List<ContextMenuCandidate> {
+        return listOf(
+            ContextMenuCandidate.createOpenInPrivateTabCandidate(
+                context,
+                tabsUseCases,
+                snackBarParentView,
+                snackbarDelegate,
+            ),
+            ContextMenuCandidate.createCopyLinkCandidate(
+                context,
+                snackBarParentView,
+                snackbarDelegate,
+            ),
             ContextMenuCandidate.createDownloadLinkCandidate(context, contextMenuUseCases),
             ContextMenuCandidate.createShareLinkCandidate(context),
-            ContextMenuCandidate.createShareImageCandidate(context, contextMenuUseCases)
-        ) + if (context.components.experiments.isMultiTabsEnabled) {
-            listOf(
-                ContextMenuCandidate.createOpenImageInNewTabCandidate(
-                    context,
-                    tabsUseCases,
-                    snackBarParentView,
-                    snackbarDelegate
-                )
-            )
-        } else {
-            emptyList()
-        } + listOf(
+            ContextMenuCandidate.createShareImageCandidate(context, contextMenuUseCases),
+            ContextMenuCandidate.createOpenImageInNewTabCandidate(
+                context,
+                tabsUseCases,
+                snackBarParentView,
+                snackbarDelegate,
+            ),
             ContextMenuCandidate.createSaveImageCandidate(context, contextMenuUseCases),
             ContextMenuCandidate.createSaveVideoAudioCandidate(context, contextMenuUseCases),
             ContextMenuCandidate.createCopyImageLocationCandidate(
                 context,
                 snackBarParentView,
-                snackbarDelegate
+                snackbarDelegate,
             ),
             ContextMenuCandidate.createAddContactCandidate(context),
             ContextMenuCandidate.createShareEmailAddressCandidate(context),
             ContextMenuCandidate.createCopyEmailAddressCandidate(
                 context,
                 snackBarParentView,
-                snackbarDelegate
+                snackbarDelegate,
             ),
             ContextMenuCandidate.createOpenInExternalAppCandidate(
                 context,
-                appLinksUseCases
-            )
+                appLinksUseCases,
+            ),
         )
+    }
 }

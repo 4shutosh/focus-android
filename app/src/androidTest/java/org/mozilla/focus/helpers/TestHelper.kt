@@ -3,54 +3,80 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mozilla.focus.helpers
 
+import android.annotation.TargetApi
+import android.app.PendingIntent
+import android.app.UiAutomation
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.text.format.DateUtils
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.os.Build.VERSION.SDK_INT
+import android.os.Bundle
+import android.provider.MediaStore
+import android.provider.MediaStore.setIncludePending
 import android.util.Log
 import android.view.KeyEvent
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.intent.Intents.intended
+import androidx.test.espresso.intent.matcher.IntentMatchers.toPackage
 import androidx.test.espresso.matcher.ViewMatchers
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.web.sugar.Web
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiSelector
-import okhttp3.mockwebserver.MockResponse
+import junit.framework.AssertionFailedError
 import okio.Buffer
 import org.hamcrest.Matchers
 import org.hamcrest.Matchers.allOf
 import org.junit.Assert
 import org.junit.Assert.assertTrue
 import org.mozilla.focus.R
-import org.mozilla.focus.utils.AppConstants.isKlarBuild
-import java.io.BufferedReader
-import java.io.File
+import org.mozilla.focus.activity.IntentReceiverActivity
+import org.mozilla.focus.ext.getApplicationInfoCompat
+import org.mozilla.focus.utils.IntentUtils
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.InputStreamReader
-import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
 @Suppress("TooManyFunctions")
 object TestHelper {
     @JvmField
-    var mDevice = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-    const val waitingTime = DateUtils.SECOND_IN_MILLIS * 15
-    const val waitingTimeShort = DateUtils.SECOND_IN_MILLIS * 5
+    var mDevice = UiDevice.getInstance(getInstrumentation())
+    val waitingTime = TimeUnit.SECONDS.toMillis(15)
+    val pageLoadingTime = TimeUnit.SECONDS.toMillis(25)
+    val waitingTimeShort: Long = TimeUnit.SECONDS.toMillis(3)
+
+    private val charPool: List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    fun randomString(stringLength: Int) =
+        (1..stringLength)
+            .map { kotlin.random.Random.nextInt(0, charPool.size) }
+            .map(charPool::get)
+            .joinToString("")
 
     @JvmStatic
-    val appContext: Context = InstrumentationRegistry.getInstrumentation().targetContext
+    val getTargetContext: Context = getInstrumentation().targetContext
 
     @JvmStatic
-    val packageName: String = appContext.packageName
+    val packageName: String = getTargetContext.packageName
 
     @JvmStatic
-    val appName: String = appContext.getString(R.string.app_name)
+    val appName: String = getTargetContext.getString(R.string.app_name)
 
-    fun getStringResource(id: Int) = appContext.resources.getString(id, appName)
+    fun getStringResource(id: Int) = getTargetContext.resources.getString(id, appName)
 
     fun verifySnackBarText(text: String) {
         val snackbarText = mDevice.findObject(UiSelector().textContains(text))
@@ -62,8 +88,8 @@ object TestHelper {
             onView(
                 allOf(
                     withId(R.id.snackbar_action),
-                    withText(action)
-                )
+                    withText(action),
+                ),
             )
         snackbarActionButton.perform(click())
     }
@@ -75,8 +101,8 @@ object TestHelper {
 
     fun isPackageInstalled(packageName: String): Boolean {
         return try {
-            val packageManager = InstrumentationRegistry.getInstrumentation().context.packageManager
-            packageManager.getApplicationInfo(packageName, 0).enabled
+            val packageManager = getInstrumentation().context.packageManager
+            packageManager.getApplicationInfoCompat(packageName, 0).enabled
         } catch (exception: PackageManager.NameNotFoundException) {
             Log.d("TestLog", exception.message.toString())
             false
@@ -132,182 +158,102 @@ object TestHelper {
     fun verifyTranslatedTextExists(text: String) =
         assertTrue(mDevice.findObject(UiSelector().text(text)).waitForExists(waitingTime))
 
-    // wait for web area to be visible
-    @JvmStatic
-    fun waitForWebContent() {
-        Assert.assertTrue(geckoView.waitForExists(waitingTime))
+    fun openAppFromExternalLink(url: String) {
+        val intent = Intent().apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse(url)
+            `package` = packageName
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        try {
+            getTargetContext.startActivity(intent)
+        } catch (ex: ActivityNotFoundException) {
+            intent.setPackage(null)
+            getTargetContext.startActivity(intent)
+        }
     }
 
-    @JvmField
-    var nextBtn = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/next")
-            .enabled(true)
-    )
+    fun verifyDownloadedFileOnStorage(fileName: String) {
+        val context = getInstrumentation().targetContext
+        val resolver = context.contentResolver
+        val fileUri = queryDownloadMediaStore(fileName)
 
-    /********* Main View Locators  */
-    @JvmField
-    var menuButton = Espresso.onView(
-        Matchers.allOf(
-            ViewMatchers.withId(R.id.menuView),
-            ViewMatchers.isDisplayed()
-        )
-    )
+        val fileExists: Boolean = fileUri?.let {
+            resolver.openInputStream(fileUri).use {
+                it != null
+            }
+        } ?: false
 
-    /********* Web View Locators  */
-    @JvmField
-    var browserURLbar = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/display_url")
-            .clickable(true)
-    )
+        assertTrue(fileExists)
+    }
 
-    @JvmField
-    var permAllowBtn = mDevice.findObject(
-        UiSelector()
-            .textContains("Allow")
-            .clickable(true)
-    )
+    /**
+     * Check the "Downloads" public directory for [fileName] and returns an URI to it.
+     * May be `null` if there is no file with that name in "Downloads".
+     */
+    @TargetApi(Build.VERSION_CODES.Q)
+    private fun queryDownloadMediaStore(fileName: String): Uri? {
+        val context = getInstrumentation().targetContext
+        val resolver = context.contentResolver
+        val queryProjection = arrayOf(MediaStore.Downloads._ID)
+        val querySelection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+        val querySelectionArgs = arrayOf(fileName)
 
-    @JvmField
-    var inlineAutocompleteEditText = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/urlView")
-            .focused(true)
-            .enabled(true)
-    )
+        val queryBundle = Bundle().apply {
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, querySelection)
+            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, querySelectionArgs)
+        }
 
-    @JvmField
-    var hint = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/searchView")
-            .clickable(true)
-    )
+        // Query if we have a pending download with the same name. This can happen
+        // if a download was interrupted, failed or cancelled before the file was
+        // written to disk. Our logic above will have generated a unique file name
+        // based on existing files on the device, but we might already have a row
+        // for the download in the content resolver.
+        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val queryCollection =
+            if (SDK_INT >= Build.VERSION_CODES.R) {
+                queryBundle.putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
+                collection
+            } else {
+                @Suppress("DEPRECATION")
+                setIncludePending(collection)
+            }
 
-    @JvmField
-    var webView = mDevice.findObject(
-        UiSelector()
-            .className("android.webkit.WebView")
-            .enabled(true)
-    )
-    var geckoView = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/engineView")
-            .enabled(true)
-    )
+        var downloadUri: Uri? = null
+        resolver.query(
+            queryCollection,
+            queryProjection,
+            queryBundle,
+            null,
+        )?.use {
+            if (it.count > 0) {
+                val idColumnIndex = it.getColumnIndex(MediaStore.Downloads._ID)
+                it.moveToFirst()
+                downloadUri = ContentUris.withAppendedId(collection, it.getLong(idColumnIndex))
+            }
+        }
 
-    @JvmField
-    var progressBar = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/progress")
-            .enabled(true)
-    )
+        return downloadUri
+    }
 
-    @JvmField
-    var floatingEraseButton = Espresso.onView(
-        // Replace -1 with the real id of erase button
-        Matchers.allOf(ViewMatchers.withId(-1), ViewMatchers.isDisplayed())
-    )
+    // Method for granting app permission to access location/camera/mic
+    fun grantAppPermission() {
+        if (SDK_INT >= 23) {
+            mDevice.findObject(
+                UiSelector().textContains(
+                    when (SDK_INT) {
+                        Build.VERSION_CODES.R ->
+                            "While using the app"
+                        else -> "Allow"
+                    },
+                ),
+            ).click()
+        }
+    }
 
-    @JvmField
-    var erasedMsg = mDevice.findObject(
-        UiSelector()
-            .text("Your browsing history has been erased.")
-            .resourceId(packageName + ":id/snackbar_text")
-            .enabled(true)
-    )
-
-    @JvmField
-    var lockIcon = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/lock")
-            .description("Secure connection")
-    )
-
-    @JvmField
-    var notificationBarDeleteItem = mDevice.findObject(
-        UiSelector()
-            .text("Erase browsing history")
-            .resourceId("android:id/text")
-            .enabled(true)
-    )
-
-    @JvmField
-    var AddtoHSmenuItem = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/add_to_homescreen")
-            .enabled(true)
-    )
-
-    @JvmField
-    var AddtoHSCancelBtn = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/addtohomescreen_dialog_cancel")
-            .enabled(true)
-    )
-
-    @JvmField
-    var savedNotification = mDevice.findObject(
-        UiSelector()
-            .text("Download complete.")
-            .resourceId("android:id/text")
-            .enabled(true)
-    )
-
-    @JvmField
-    var securityInfoIcon = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/security_info")
-            .enabled(true)
-    )
-
-    @JvmField
-    var identityState = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/site_identity_state")
-            .enabled(true)
-    )
-
-    @JvmField
-    var downloadTitle = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/title_template")
-            .enabled(true)
-    )
-
-    @JvmField
-    var downloadBtn = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/download_dialog_download")
-            .enabled(true)
-    )
-
-    /********** Share Menu Dialog  */
-    @JvmField
-    var shareMenuHeader = mDevice.findObject(
-        UiSelector()
-            .resourceId("android:id/title")
-            .text("Share via")
-            .enabled(true)
-    )
-
-    @JvmField
-    var shareAppList = mDevice.findObject(
-        UiSelector()
-            .resourceId("android:id/resolver_list")
-            .enabled(true)
-    )
-
-    /********* Settings Menu Item Locators  */
-    @JvmField
-    var settingsMenu = mDevice.findObject(
-        UiSelector()
-            .resourceId(packageName + ":id/recycler_view")
-    )
-
-    @JvmStatic
-    fun waitForIdle() {
-        mDevice.waitForIdle(waitingTime)
+    fun UiAutomation.executeShellCommandBlocking(command: String) {
+        val output = executeShellCommand(command)
+        FileInputStream(output.fileDescriptor).use { it.readBytes() }
     }
 
     @JvmStatic
@@ -325,17 +271,124 @@ object TestHelper {
         mDevice.pressHome()
     }
 
-    @JvmStatic
-    @Throws(IOException::class)
-    fun createMockResponseFromAsset(fileName: String): MockResponse {
-        return MockResponse()
-            .setBody(readTestAsset(fileName))
+    @Suppress("Deprecation")
+    fun createCustomTabIntent(
+        pageUrl: String,
+        customMenuItemLabel: String = "",
+        customActionButtonDescription: String = "",
+    ): Intent {
+        val appContext = getInstrumentation()
+            .targetContext
+            .applicationContext
+        val pendingIntent = PendingIntent.getActivity(appContext, 0, Intent(), IntentUtils.defaultIntentPendingFlags)
+        val customTabsIntent = CustomTabsIntent.Builder()
+            .addMenuItem(customMenuItemLabel, pendingIntent)
+            .addDefaultShareMenuItem()
+            .setActionButton(createTestBitmap(), customActionButtonDescription, pendingIntent, true)
+            .setToolbarColor(Color.MAGENTA)
+            .build()
+        customTabsIntent.intent.data = Uri.parse(pageUrl)
+        customTabsIntent.intent.component = ComponentName(appContext, IntentReceiverActivity::class.java)
+        return customTabsIntent.intent
     }
+
+    fun assertNativeAppOpens(appPackageName: String) {
+        try {
+            if (isPackageInstalled(packageName)) {
+                intended(toPackage(appPackageName))
+            }
+        } catch (e: AssertionFailedError) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun createTestBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.GREEN)
+        return bitmap
+    }
+
+    /********* Old code locators - used only in Screenshots tests  */
+    // wait for web area to be visible
+    @JvmStatic
+    fun waitForWebContent() {
+        Assert.assertTrue(geckoView.waitForExists(waitingTime))
+    }
+
+    @JvmField
+    var menuButton = Espresso.onView(
+        Matchers.allOf(
+            ViewMatchers.withId(R.id.menuView),
+            ViewMatchers.isDisplayed(),
+        ),
+    )
+
+    @JvmField
+    var permAllowBtn = mDevice.findObject(
+        UiSelector()
+            .textContains("Allow")
+            .clickable(true),
+    )
+
+    @JvmField
+    var webView = mDevice.findObject(
+        UiSelector()
+            .className("android.webkit.WebView")
+            .enabled(true),
+    )
+    var geckoView = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/engineView")
+            .enabled(true),
+    )
+
+    @JvmField
+    var progressBar = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/progress")
+            .enabled(true),
+    )
+
+    @JvmField
+    var AddtoHSmenuItem = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/add_to_homescreen")
+            .enabled(true),
+    )
+
+    @JvmField
+    var AddtoHSCancelBtn = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/addtohomescreen_dialog_cancel")
+            .enabled(true),
+    )
+
+    @JvmField
+    var securityInfoIcon = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/security_info")
+            .enabled(true),
+    )
+
+    @JvmField
+    var identityState = mDevice.findObject(
+        UiSelector()
+            .resourceId(packageName + ":id/site_identity_state")
+            .enabled(true),
+    )
+
+    @JvmField
+    var shareAppList = mDevice.findObject(
+        UiSelector()
+            .resourceId("android:id/resolver_list")
+            .enabled(true),
+    )
 
     @JvmStatic
     @Throws(IOException::class)
     fun readTestAsset(filename: String?): Buffer {
-        InstrumentationRegistry.getInstrumentation().getContext().assets.open(filename!!)
+        getInstrumentation().getContext().assets.open(filename!!)
             .use { stream -> return readStreamFile(stream) }
     }
 
@@ -347,40 +400,7 @@ object TestHelper {
     }
 
     @JvmStatic
-    @Throws(IOException::class)
-    fun readFileToString(file: File): String {
-        println("Reading file: " + file.absolutePath)
-        FileInputStream(file).use { stream -> return readStreamIntoString(stream) }
-    }
-
-    @Throws(IOException::class)
-    fun readStreamIntoString(stream: InputStream?): String {
-        BufferedReader(
-            InputStreamReader(stream, StandardCharsets.UTF_8)
-        ).use { reader ->
-            val builder = StringBuilder()
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                builder.append(line)
-            }
-            reader.close()
-            return builder.toString()
-        }
-    }
-
-    @JvmStatic
     fun waitForWebSiteTitleLoad() {
         Web.onWebView(ViewMatchers.withText("focus test page"))
-    }
-
-    @JvmStatic
-    fun selectGeckoForKlar() {
-        InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences(
-            "mozilla.components.service.fretboard.overrides",
-            Context.MODE_PRIVATE
-        )
-            .edit()
-            .putBoolean("use-gecko", isKlarBuild)
-            .commit()
     }
 }
