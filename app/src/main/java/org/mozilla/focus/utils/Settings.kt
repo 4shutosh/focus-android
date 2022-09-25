@@ -372,6 +372,17 @@ class Settings(
         false
     )
 
+    var isSwipeToolbarToSwitchTabsEnabled: Boolean
+        get() = preferences.getBoolean(
+            getPreferenceKey(R.string.pref_key_swipe_toolbar_switch_tabs),
+            true
+        )
+        set(value) {
+            preferences.edit()
+                .putBoolean(getPreferenceKey(R.string.pref_key_swipe_toolbar_switch_tabs), value)
+                .apply()
+        }
+
     // Store how many tabs were opened until now, but the max value which can be stored is 4
     // since this values is used to decide if we should display the erase cfr
     var numberOfTabsOpened: Int

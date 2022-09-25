@@ -89,4 +89,6 @@
 
     <!-- Opened tabs counter used to trigger erase tabs CFR -->
     <string name="number_of_opened_tabs" translatable="false">number_of_opened_tabs</string>
+
+    <string name="pref_key_swipe_toolbar_switch_tabs" translatable="false"><xliff:g id="preference_key">pref_key_swipe_toolbar_switch_tabs</xliff:g></string>
 </resources>
